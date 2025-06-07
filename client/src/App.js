@@ -1,10 +1,10 @@
 import React from 'react';
-import FaceRecorder from './components/FaceRecorder';
+import FaceExpressionDetector from './components/FaceExpressionDetector';
 
 function App() {
   return (
     <div className="App">
-      <FaceRecorder />
+      <FaceExpressionDetector />
     </div>
   );
 }
