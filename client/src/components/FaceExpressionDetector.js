@@ -10,6 +10,15 @@ export default function FaceExpressionDetector() {
   const [smoothedEmotions, setSmoothedEmotions] = useState([]);
   const [emotionHistory, setEmotionHistory] = useState([]);
 
+  const emotionColors = {
+    neutral: '#9E9E9E',     // Gray
+    happy: '#FFD700',       // Gold
+    sad: '#2196F3',         // Blue
+    angry: '#F44336',       // Red
+    disgusted: '#8BC34A',   // Green
+    fearful: '#673AB7',     // Purple
+  };
+
   useEffect(() => {
     async function loadModels() {
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
@@ -19,12 +28,9 @@ export default function FaceExpressionDetector() {
     }
 
     function startVideo() {
-      navigator.mediaDevices
-        .getUserMedia({ video: {} })
+      navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
+          if (videoRef.current) videoRef.current.srcObject = stream;
         })
         .catch(err => console.error('Error accessing webcam:', err));
     }
@@ -33,12 +39,15 @@ export default function FaceExpressionDetector() {
   }, []);
 
   useEffect(() => {
-    let intervalId;
+    if (loading) return;
 
-    async function onPlay() {
+    const options = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 512,
+      scoreThreshold: 0.3,
+    });
+
+    const intervalId = setInterval(async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
-
-      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.3 });
 
       const result = await faceapi
         .detectSingleFace(videoRef.current, options)
@@ -49,11 +58,11 @@ export default function FaceExpressionDetector() {
 
       if (result) {
         const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
-        const resizedResults = faceapi.resizeResults(result, dims);
-        faceapi.draw.drawDetections(canvasRef.current, resizedResults);
+        const resized = faceapi.resizeResults(result, dims);
+        faceapi.draw.drawDetections(canvasRef.current, resized);
 
-        const expressions = resizedResults.expressions || {};
-        const groupedExpressions = {
+        const { expressions = {} } = resized;
+        const grouped = {
           neutral: expressions.neutral || 0,
           happy: expressions.happy || 0,
           sad: expressions.sad || 0,
@@ -63,16 +72,12 @@ export default function FaceExpressionDetector() {
         };
 
         setEmotionHistory(prev => {
-          const updated = [...prev, groupedExpressions].slice(-10); // keep last 10 frames
+          const recent = [...prev, grouped].slice(-10);
+          const averaged = Object.keys(grouped).reduce((acc, key) => {
+            acc[key] = recent.reduce((sum, e) => sum + (e[key] || 0), 0) / recent.length;
+            return acc;
+          }, {});
 
-          // Average over history
-          const averaged = {};
-          Object.keys(groupedExpressions).forEach(key => {
-            averaged[key] =
-              updated.reduce((sum, e) => sum + (e[key] || 0), 0) / updated.length;
-          });
-
-          // Prepare for display
           const sorted = Object.entries(averaged)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 4)
@@ -82,25 +87,20 @@ export default function FaceExpressionDetector() {
             }));
 
           setSmoothedEmotions(sorted);
-          return updated;
+          return recent;
         });
       } else {
         setSmoothedEmotions([]);
         setEmotionHistory([]);
       }
-    }
-
-    if (!loading) {
-      intervalId = setInterval(onPlay, 300);
-    }
+    }, 300);
 
     return () => clearInterval(intervalId);
   }, [loading]);
 
   return (
-    <div style={{ width: '640px', margin: 'auto' }}>
-      {loading && <p>Loading models, please wait...</p>}
-      <div style={{ position: 'relative' }}>
+    <div className="app-container" style={{ display: 'flex' }}>
+      <div className="video-wrapper">
         <video
           ref={videoRef}
           autoPlay
@@ -108,43 +108,34 @@ export default function FaceExpressionDetector() {
           playsInline
           width="640"
           height="480"
-          style={{ borderRadius: '10px' }}
         />
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', top: 0, left: 0 }}
           width="640"
           height="480"
+          className="overlay-canvas"
         />
       </div>
 
-      <div style={{ marginTop: '20px' }}>
-        {smoothedEmotions.length > 0 ? (
-          <div>
-            {smoothedEmotions.map(({ emotion, probability }) => (
-              <div key={emotion} style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                  {emotion.charAt(0).toUpperCase() + emotion.slice(1)}: {probability}%
-                </div>
-                <div style={{
-                  background: '#ddd',
-                  borderRadius: '4px',
-                  height: '16px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${probability}%`,
-                    background: '#007bff',
-                    height: '100%',
-                    transition: 'width 0.6s ease'
-                  }}></div>
-                </div>
+      <div className="emotion-bar-graph">
+        {['neutral', 'happy', 'sad', 'angry', 'disgusted', 'fearful'].map((emotion) => {
+          const match = smoothedEmotions.find(e => e.emotion === emotion);
+          const probability = match ? match.probability : 0;
+          return (
+            <div className="bar-container" key={emotion}>
+              <div
+                className="bar-fill"
+                style={{
+                  height: `${probability * 2}px`,
+                  backgroundColor: emotionColors[emotion] || '#007bff',
+                }}
+              />
+              <div className="bar-label">
+                {emotion} {probability}%
               </div>
-            ))}
-          </div>
-        ) : (
-          <div>No face detected</div>
-        )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React from 'react';
 import FaceExpressionDetector from './components/FaceExpressionDetector';
+import './App.css';
 
 function App() {
   return (
