@@ -1,13 +1,14 @@
 import React from 'react';
 import FaceExpressionDetector from './components/FaceExpressionDetector';
-import VoiceEmotionAnalyzer from './components/VoiceEmotionAnalyzer';
+import VoiceRecorder from "./components/VoiceRecorder";
 import './App.css';
 
 function App() {
   return (
     <div className="App">
       <FaceExpressionDetector />
-      <VoiceEmotionAnalyzer />
+      <h1>AI Lie Detector</h1>
+      <VoiceRecorder />
     </div>
   );
 }
