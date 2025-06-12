@@ -4,6 +4,9 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,24 +32,24 @@ app.post("/analyze-voice", upload.array("audioFiles"), async (req, res) => {
 
   if (!wavBuffers.length) return res.status(400).json({ error: "No valid segments" });
 
-  const py = spawn("python", [path.join(__dirname, "voice_analysis.py")]);
-  let out = "", err = "";
+  try {
+    const pyRes = await fetch(`${process.env.PYTHON_API_URL}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wav_buffers: wavBuffers }),
+    });
 
-  py.stdout.on("data", d => out += d);
-  py.stderr.on("data", d => err += d);
-
-  py.on("close", code => {
-    if (code !== 0) return res.status(500).json({ error: err || "Python error" });
-
-    try {
-      return res.json(JSON.parse(out));
-    } catch {
-      return res.status(500).json({ error: "Invalid JSON from Python", raw: out });
+    if (!pyRes.ok) {
+      const errText = await pyRes.text();
+      throw new Error(`FastAPI error: ${errText}`);
     }
-  });
 
-  py.stdin.write(JSON.stringify({ wav_buffers: wavBuffers }));
-  py.stdin.end();
+    const json = await pyRes.json();
+    res.json(json);
+  } catch (err) {
+    console.error("Failed to contact FastAPI:", err.message);
+    res.status(500).json({ error: "FastAPI server error", detail: err.message });
+  }
 });
 
 function convertWebmToWav(inputBuffer) {
