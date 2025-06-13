@@ -11,12 +11,12 @@ export default function FaceExpressionDetector() {
   const [emotionHistory, setEmotionHistory] = useState([]);
 
   const emotionColors = {
-    neutral: '#9E9E9E',     // Gray
-    happy: '#FFD700',       // Gold
-    sad: '#2196F3',         // Blue
-    angry: '#F44336',       // Red
-    disgusted: '#8BC34A',   // Green
-    fearful: '#673AB7',     // Purple
+    neutral: '#9E9E9E', 
+    happy: '#FFD700', 
+    sad: '#2196F3',
+    angry: '#F44336', 
+    disgusted: '#8BC34A', 
+    fearful: '#673AB7',
   };
 
   useEffect(() => {
