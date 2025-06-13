@@ -1,65 +1,77 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.app-container {
+.app-layout {
   display: flex;
+  gap: 20px;
   font-family: sans-serif;
+  width: 100vw;
+  padding: 20px;
+  box-sizing: border-box;
+  background-color: #f7f7f7;
 }
 
+h2 {
+  margin-top: -5px;
+}
+
+.right-pane {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: white;
+  width: 900px;
+  height: 260px;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+}
+
+/* Video section */
 .video-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: relative;
   width: 640px;
   height: 480px;
-  z-index: 10;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: black;
 }
 
-.overlay-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-}
-
+/* Container for the emotion bars */
 .emotion-bar-graph {
   display: flex;
-  flex-direction: row;
+  gap: 12px;
   align-items: flex-end;
   justify-content: center;
-  gap: 20px;
-  margin-left: 680px;
-  margin-top: 40px;
-  height: 200px;
   width: 600px;
 }
 
+/* Individual bar container */
 .bar-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 50px;
+  width: 100px;
 }
 
+/* The colored bar */
 .bar-fill {
   width: 100%;
+  border-radius: 8px 8px 0 0;
   transition: height 0.3s ease;
-  border-radius: 4px 4px 0 0;
+  background-color: var(--bar-color, #007bff);
 }
 
+/* Label under each bar */
 .bar-label {
   margin-top: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
   text-align: center;
+  color: #333;
 }

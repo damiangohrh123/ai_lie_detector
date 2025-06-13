@@ -3,7 +3,7 @@ import * as faceapi from 'face-api.js';
 
 const MODEL_URL = process.env.PUBLIC_URL + '/models';
 
-export default function FaceExpressionDetector() {
+export default function FaceExpressionDetector({ onEmotionsUpdate }) {  // <-- added prop
   const videoRef = useRef();
   const canvasRef = useRef();
   const [loading, setLoading] = useState(true);
@@ -98,6 +98,13 @@ export default function FaceExpressionDetector() {
     return () => clearInterval(intervalId);
   }, [loading]);
 
+  // New effect: send emotions to parent
+  useEffect(() => {
+    if (onEmotionsUpdate) {
+      onEmotionsUpdate(smoothedEmotions);
+    }
+  }, [smoothedEmotions, onEmotionsUpdate]);
+
   return (
     <div className="app-container" style={{ display: 'flex' }}>
       <div className="video-wrapper">
@@ -115,27 +122,6 @@ export default function FaceExpressionDetector() {
           height="480"
           className="overlay-canvas"
         />
-      </div>
-
-      <div className="emotion-bar-graph">
-        {['neutral', 'happy', 'sad', 'angry', 'disgusted', 'fearful'].map((emotion) => {
-          const match = smoothedEmotions.find(e => e.emotion === emotion);
-          const probability = match ? match.probability : 0;
-          return (
-            <div className="bar-container" key={emotion}>
-              <div
-                className="bar-fill"
-                style={{
-                  height: `${probability * 2}px`,
-                  backgroundColor: emotionColors[emotion] || '#007bff',
-                }}
-              />
-              <div className="bar-label">
-                {emotion} {probability}%
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

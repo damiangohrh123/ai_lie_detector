@@ -1,32 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import FaceExpressionDetector from './components/FaceExpressionDetector';
 import VoiceRecorder from './components/VoiceRecorder';
+import FaceAnalysisBars from './components/FaceAnalysisBars';
 import './App.css';
 
-function App() {
+export default function App() {
+  const [faceEmotions, setFaceEmotions] = useState([]);
+
   return (
     <div className="app-layout">
       <div className="left-pane">
-        <FaceExpressionDetector />
+        <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
       </div>
+
       <div className="right-pane">
-        <section className="section facial-analysis">
-          <h2>Facial Analysis</h2>
-        </section>
-        <section className="section voice-analysis">
+        <section className="section">
           <h2>Voice Analysis</h2>
           <VoiceRecorder />
         </section>
-        <section className="section text-analysis">
+        <section className="section">
+          <h2>Face Analysis</h2>
+          <FaceAnalysisBars smoothedEmotions={faceEmotions} />
+        </section>
+        <section className="section">
           <h2>Text Analysis</h2>
-
-          <div style={{padding: '10px', fontStyle: 'italic', color: '#555'}}>
-            Text analysis will appear here.
-          </div>
         </section>
       </div>
     </div>
   );
 }
-
-export default App;

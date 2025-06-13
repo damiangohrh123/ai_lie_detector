@@ -121,8 +121,8 @@ export default function VoiceRecorder() {
   const combinedTranscript = results.map((r) => r.text).join(" ");
 
   return (
-    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div className="emotion-bar-graph" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', height: '220px' }}>
+    <div>
+      <div className="emotion-bar-graph">
         {['neu', 'hap', 'sad', 'ang'].map((emotion) => {
           const match = sortedAverages.find(e => e.emotion === emotion);
           const probability = match ? match.probability : 0;
@@ -132,7 +132,7 @@ export default function VoiceRecorder() {
                 className="bar-fill"
                 style={{
                   width: '40px',
-                  height: `${probability * 2}px`,
+                  height: `${probability}px`,
                   backgroundColor: emotionColors[emotion] || '#007bff',
                   borderRadius: '8px 8px 0 0',
                   transition: 'height 0.3s',
