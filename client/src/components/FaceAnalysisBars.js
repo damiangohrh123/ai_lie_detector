@@ -5,6 +5,8 @@ const emotionColors = {
   happy: '#FFD700',
   sad: '#2196F3',
   angry: '#F44336',
+  disgusted: '#8BC34A',
+  fearful: '#673AB7',
 };
 
 const emotionFullNames = {
@@ -12,12 +14,14 @@ const emotionFullNames = {
   happy: "Happy",
   sad: "Sad",
   angry: "Angry",
+  disgusted: "Disgusted",
+  fearful: "Fearful",
 };
 
 export default function FaceAnalysisBars({ smoothedEmotions }) {
   return (
-      <div className="emotion-bar-graph" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', height: '220px' }}>
-      {['neutral', 'happy', 'sad', 'angry'].map((emotion) => {
+    <div className="emotion-bar-graph" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', height: '220px' }}>
+      {['neutral', 'happy', 'sad', 'angry', 'disgusted', 'fearful'].map((emotion) => {
         const match = smoothedEmotions.find((e) => e.emotion === emotion);
         const probability = match ? match.probability : 0;
         return (
@@ -30,7 +34,7 @@ export default function FaceAnalysisBars({ smoothedEmotions }) {
               className="bar-fill"
               style={{
                 width: '40px',
-                height: `${probability}px`,
+                height: `${probability * 2}px`, // Multiply for better visibility if needed
                 backgroundColor: emotionColors[emotion] || '#007bff',
                 borderRadius: '8px 8px 0 0',
                 transition: 'height 0.3s',
