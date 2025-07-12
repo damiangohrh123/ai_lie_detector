@@ -3,30 +3,23 @@ import * as faceapi from 'face-api.js';
 
 const MODEL_URL = process.env.PUBLIC_URL + '/models';
 
-export default function FaceExpressionDetector({ onEmotionsUpdate }) {  // <-- added prop
+export default function FaceExpressionDetector({ onEmotionsUpdate }) {
   const videoRef = useRef();
   const canvasRef = useRef();
   const [loading, setLoading] = useState(true);
   const [smoothedEmotions, setSmoothedEmotions] = useState([]);
   const [emotionHistory, setEmotionHistory] = useState([]);
 
-  const emotionColors = {
-    neutral: '#9E9E9E', 
-    happy: '#FFD700', 
-    sad: '#2196F3',
-    angry: '#F44336', 
-    disgusted: '#8BC34A', 
-    fearful: '#673AB7',
-  };
-
   useEffect(() => {
+    // Load tiny face detector and face expression net
     async function loadModels() {
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
       setLoading(false);
       startVideo();
     }
-
+    
+    // Start video
     function startVideo() {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
@@ -34,33 +27,38 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {  // <-- a
         })
         .catch(err => console.error('Error accessing webcam:', err));
     }
-
     loadModels();
   }, []);
 
   useEffect(() => {
     if (loading) return;
 
+    // 512 resolution, and 0.3 confidence threshold
     const options = new faceapi.TinyFaceDetectorOptions({
       inputSize: 512,
       scoreThreshold: 0.3,
     });
 
+    // Run every 300ms
     const intervalId = setInterval(async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
 
+      // Detect face and expressions
       const result = await faceapi
         .detectSingleFace(videoRef.current, options)
         .withFaceExpressions();
 
+      // Clear canvas to reset detections
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
       if (result) {
+        // Draw the bounding box on the detected face
         const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
         const resized = faceapi.resizeResults(result, dims);
         faceapi.draw.drawDetections(canvasRef.current, resized);
 
+        // Get the expressions (Combine surprised and fearful)
         const { expressions = {} } = resized;
         const grouped = {
           neutral: expressions.neutral || 0,
@@ -71,13 +69,17 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {  // <-- a
           fearful: (expressions.fearful || 0) + (expressions.surprised || 0),
         };
 
+        // Rolling average over last 10 frames
         setEmotionHistory(prev => {
           const recent = [...prev, grouped].slice(-10);
+
+          // Compute average for each emotion
           const averaged = Object.keys(grouped).reduce((acc, key) => {
             acc[key] = recent.reduce((sum, e) => sum + (e[key] || 0), 0) / recent.length;
             return acc;
           }, {});
 
+          // Sort and keep top 4
           const sorted = Object.entries(averaged)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 4)
@@ -85,7 +87,6 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {  // <-- a
               emotion,
               probability: parseFloat((prob * 100).toFixed(1)),
             }));
-
           setSmoothedEmotions(sorted);
           return recent;
         });
@@ -98,11 +99,9 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {  // <-- a
     return () => clearInterval(intervalId);
   }, [loading]);
 
-  // New effect: send emotions to parent
+  // Send emotions to parent
   useEffect(() => {
-    if (onEmotionsUpdate) {
-      onEmotionsUpdate(smoothedEmotions);
-    }
+    if (onEmotionsUpdate) onEmotionsUpdate(smoothedEmotions);
   }, [smoothedEmotions, onEmotionsUpdate]);
 
   return (
