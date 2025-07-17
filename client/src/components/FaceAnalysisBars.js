@@ -25,10 +25,7 @@ export default function FaceAnalysisBars({ smoothedEmotions }) {
         const match = smoothedEmotions.find((e) => e.emotion === emotion);
         const probability = match ? match.probability : 0;
         return (
-          <div
-            className="bar-container"
-            key={emotion}
-          >
+          <div className="bar-container" key={emotion}>
             <div className="bar"
               style={{
                 height: `${probability * 1.5}px`,
@@ -36,8 +33,7 @@ export default function FaceAnalysisBars({ smoothedEmotions }) {
               }}
             />
             <div className="bar-label">
-              {emotionFullNames[emotion]}<br />
-              {probability}%
+              {emotionFullNames[emotion]}<br />{probability}%
             </div>
           </div>
         );

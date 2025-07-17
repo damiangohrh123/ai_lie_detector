@@ -140,35 +140,24 @@ export default function VoiceRecorder() {
   const combinedTranscript = results.map((r) => r.text).join(" ");
 
   return (
-    <div>
       <div className="emotion-bar-graph">
         {['neu', 'hap', 'sad', 'ang'].map((emotion) => {
           const match = topEmotions.find(e => e.emotion === emotion);
           const probability = match ? match.probability : 0;
           return (
-            <div className="bar-container" key={emotion} style={{ textAlign: 'center' }}>
-              <div
-                className="bar-fill"
+            <div className="bar-container" key={emotion}>
+              <div className="bar"
                 style={{
-                  width: '40px',
-                  height: `${probability}px`,
-                  backgroundColor: emotionColors[emotion] || '#007bff',
-                  borderRadius: '8px 8px 0 0',
-                  transition: 'height 0.3s',
+                  height: `${probability * 1.5}px`,
+                  backgroundColor: emotionColors[emotion] || '#007bff'
                 }}
               />
-              <div className="bar-label" style={{ marginTop: '8px', fontWeight: 'bold' }}>
+              <div className="bar-label">
                 {emotionFullNames[emotion]}<br />{probability}%
               </div>
             </div>
           );
         })}
       </div>
-
-      <div style={{ marginTop: '30px', maxWidth: '600px', textAlign: 'left', fontSize: '1.1rem' }}>
-        <strong>Transcript:</strong>
-        <p>{combinedTranscript || "..."}</p>
-      </div>
-    </div>
   );
 };
