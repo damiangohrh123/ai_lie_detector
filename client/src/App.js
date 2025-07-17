@@ -9,23 +9,27 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      <div className="left-pane">
+      <div className="first-pane">
         <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
       </div>
 
-      <div className="right-pane">
+      <div className="second-pane">
         <section className="section">
-          <h2>Voice Analysis</h2>
+          <h2 className="section-label">Voice Analysis</h2>
           <VoiceRecorder />
         </section>
         <section className="section">
-          <h2>Face Analysis</h2>
+          <h2 className="section-label">Face Analysis</h2>
           <FaceAnalysisBars smoothedEmotions={faceEmotions} />
         </section>
         <section className="section">
-          <h2>Text Analysis</h2>
+          <h2 className="section-label">Text Analysis</h2>
         </section>
       </div>
+      <div className="third-pane">
+
+      </div>
     </div>
+    
   );
 }

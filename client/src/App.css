@@ -1,87 +1,85 @@
+html, body, #root {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 .app-layout {
   display: flex;
-  gap: 20px;
-  font-family: sans-serif;
+  flex-direction: row;
   width: 100vw;
-  padding: 20px;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
   box-sizing: border-box;
   background-color: #f7f7f7;
+  flex-wrap: nowrap;
+  gap: 20px;
 }
 
-h2 {
-  margin-top: -5px;
+.first-pane {
+  flex: 1;
+  height: 100vh;
 }
 
-.right-pane {
+.second-pane {
+  flex: 2;
   display: flex;
-  gap: 10px;
   flex-direction: column;
+  max-height: 100vh;
+  gap: 20px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.third-pane {
+  flex: 1;
+}
+
+.video-wrapper {
+  aspect-ratio: 16/9;
+  box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 20px 0 20px 20px;
 }
 
 .section {
+  width: 100%;
+  flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
   background-color: white;
-  width: 900px;
-  height: 260px;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 0 8px rgba(0,0,0,0.1);
+  box-shadow: 4px 4px 5px rgba(0, 0, 0, 0.1);
 }
 
-/* Video section */
-.video-wrapper {
-  position: relative;
-  width: 640px;
-  height: 480px;
-  flex-shrink: 0;
-  box-shadow: 0 0 10px rgba(0,0,0,0.2);
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: black;
+.section-label {
+  font-weight: normal;
+  padding: 0;
+  margin: 0;
+  flex: 1;
 }
 
-/* Canvas overlay for face detection */
-.overlay-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-/* Container for the emotion bars */
 .emotion-bar-graph {
+  flex: 2;
   display: flex;
-  gap: 12px;
+  gap: 40px;
   align-items: flex-end;
-  justify-content: center;
-  width: 600px;
+  transition: height 0.5s ease;
 }
 
-/* Individual bar container */
 .bar-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100px;
+  width: 40px;
 }
 
-/* The colored bar */
-.bar-fill {
-  width: 100%;
-  border-radius: 8px 8px 0 0;
-  transition: height 0.3s ease;
-  background-color: var(--bar-color, #007bff);
+.bar {
+  transition: height 0.5s ease;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
 }
 
-/* Label under each bar */
 .bar-label {
-  margin-top: 8px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  text-align: center;
-  color: #333;
+
 }
