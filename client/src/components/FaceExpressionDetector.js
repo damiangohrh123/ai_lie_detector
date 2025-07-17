@@ -3,22 +3,15 @@ import * as faceapi from 'face-api.js';
 
 const MODEL_URL = process.env.PUBLIC_URL + '/models';
 
-const FACE_DETECTOR = 'tiny';
-
 export default function FaceExpressionDetector({ onEmotionsUpdate }) {
   const videoRef = useRef();
   const canvasRef = useRef();
   const [loading, setLoading] = useState(true);
   const [smoothedEmotions, setSmoothedEmotions] = useState([]);
-  const [emotionHistory, setEmotionHistory] = useState([]);
 
   useEffect(() => {
     async function loadModels() {
-      if (FACE_DETECTOR === 'tiny') {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      } else {
-        await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-      }
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
       setLoading(false);
       startVideo();
@@ -42,44 +35,20 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
   useEffect(() => {
     if (loading) return;
 
-    // Detector options
     const tinyOptions = new faceapi.TinyFaceDetectorOptions({
       inputSize: 512,
       scoreThreshold: 0.3,
     });
-    const ssdOptions = new faceapi.SsdMobilenetv1Options({
-      minConfidence: 0.5,
-    });
+
+    // Store last 10 frames for smoothing
+    let emotionHistory = [];
 
     const intervalId = setInterval(async () => {
+      // Make sure video is playing
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
 
-      let result;
-      if (FACE_DETECTOR === 'tiny') {
-        result = await faceapi
-          .detectSingleFace(videoRef.current, tinyOptions)
-          .withFaceExpressions();
-      } else {
-        result = await faceapi
-          .detectSingleFace(videoRef.current, ssdOptions)
-          .withFaceExpressions();
-      }
-
-      // Draw overlay (face guide oval)
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      // Draw oval in the center as a face guide
-      ctx.save();
-      ctx.strokeStyle = 'rgba(0, 200, 255, 0.5)';
-      ctx.lineWidth = 3;
-      const cx = canvasRef.current.width / 2;
-      const cy = canvasRef.current.height / 2;
-      const rx = canvasRef.current.width * 0.25;
-      const ry = canvasRef.current.height * 0.33;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
-      ctx.stroke();
-      ctx.restore();
+      // Detect facial expression
+      const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
 
       if (result) {
         // Draw the bounding box on the detected face
@@ -98,28 +67,22 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
           fearful: (expressions.fearful || 0) + (expressions.surprised || 0),
         };
 
-        // Rolling average over last 10 frames
-        setEmotionHistory(prev => {
-          const recent = [...prev, grouped].slice(-10);
-          // Compute average for each emotion
-          const averaged = Object.keys(grouped).reduce((acc, key) => {
-            acc[key] = recent.reduce((sum, e) => sum + (e[key] || 0), 0) / recent.length;
-            return acc;
-          }, {});
-          // Sort and keep top 4
-          const sorted = Object.entries(averaged)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 4)
-            .map(([emotion, prob]) => ({
-              emotion,
-              probability: parseFloat((prob * 100).toFixed(1)),
-            }));
-          setSmoothedEmotions(sorted);
-          return recent;
-        });
+        // Rolling average over last 5 frames
+        emotionHistory = [...emotionHistory, grouped].slice(-5);
+        const averaged = {};
+        for (const key of Object.keys(grouped)) {
+          const total = emotionHistory.reduce((sum, e) => sum + (e[key] || 0), 0);
+          averaged[key] = total / emotionHistory.length;
+        }
+
+        const allEmotions = Object.entries(averaged).map(([emotion, prob]) => ({
+          emotion,
+          probability: parseFloat((prob * 100).toFixed(1)),
+        }));
+        setSmoothedEmotions(allEmotions);
       } else {
         setSmoothedEmotions([]);
-        setEmotionHistory([]);
+        emotionHistory = [];
       }
     }, 300);
 
@@ -132,23 +95,25 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
   }, [smoothedEmotions, onEmotionsUpdate]);
 
   return (
-    <div className="video-wrapper">
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        width="1280"
-        height="720"
-        style={{ width: '640px', height: '360px' }}
-      />
-      <canvas
-        ref={canvasRef}
-        width="1280"
-        height="720"
-        className="overlay-canvas"
-        style={{ width: '640px', height: '360px', position: 'absolute', top: 0, left: 0 }}
-      />
+    <div className="app-container" style={{ display: 'flex' }}>
+      <div className="video-wrapper">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          width="1280"
+          height="720"
+          style={{ width: '640px', height: '360px' }}
+        />
+        <canvas
+          ref={canvasRef}
+          width="1280"
+          height="720"
+          className="overlay-canvas"
+          style={{ width: '640px', height: '360px', position: 'absolute', top: 0, left: 0 }}
+        />
+      </div>
     </div>
   );
 }
