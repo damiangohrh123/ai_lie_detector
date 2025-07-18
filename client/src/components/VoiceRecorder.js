@@ -14,7 +14,7 @@ const emotionFullNames = {
   ang: "Angry"
 };
 
-export default function VoiceRecorder() {
+export default function VoiceRecorder({ setVoiceResults }) {
   const [results, setResults] = useState([]);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
@@ -104,6 +104,13 @@ export default function VoiceRecorder() {
     };
   }, []);
 
+  // Notify parent of transcript changes
+  useEffect(() => {
+    if (setVoiceResults) {
+      setVoiceResults(results);
+    }
+  }, [results, setVoiceResults]);
+
   // Aggregate emotion results
   const emotionSums = {};
   results.forEach((result) => { // Loop through each result
@@ -136,8 +143,6 @@ export default function VoiceRecorder() {
 
   // Keep only the top 4 emotions
   const topEmotions = averageEmotions.slice(0, 4);
-
-  const combinedTranscript = results.map((r) => r.text).join(" ");
 
   return (
       <div className="emotion-bar-graph">

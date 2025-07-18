@@ -6,13 +6,12 @@ import torch
 import torchaudio
 from transformers import (
     Wav2Vec2ForSequenceClassification,
-    Wav2Vec2FeatureExtractor,
-    Wav2Vec2ForCTC,
-    Wav2Vec2Tokenizer
+    Wav2Vec2FeatureExtractor
 )
 # Add Vosk import
 from vosk import Model as VoskModel, KaldiRecognizer
 import json
+import noisereduce as nr
 
 app = FastAPI()
 
@@ -25,17 +24,11 @@ app.add_middleware(
 )
 
 # Load models ONCE on startup
-emotion_model_name = "superb/wav2vec2-base-superb-er"
-emotion_model = Wav2Vec2ForSequenceClassification.from_pretrained(emotion_model_name)
-emotion_processor = Wav2Vec2FeatureExtractor.from_pretrained(emotion_model_name)
+emotion_model = Wav2Vec2ForSequenceClassification.from_pretrained("superb/wav2vec2-base-superb-er")
+emotion_processor = Wav2Vec2FeatureExtractor.from_pretrained("superb/wav2vec2-base-superb-er")
 emotion_model.eval()
 
-asr_model_name = "facebook/wav2vec2-base-960h"
-asr_model = Wav2Vec2ForCTC.from_pretrained(asr_model_name)
-asr_tokenizer = Wav2Vec2Tokenizer.from_pretrained(asr_model_name)
-asr_model.eval()
-
-# Load Vosk model (assume model is in 'vosk-model-small-en-us-0.15' directory)
+# Load Vosk model
 vosk_model = VoskModel("vosk-model-small-en-us-0.15")
 
 emotion_labels = ["ang", "hap", "neu", "sad"]
@@ -47,6 +40,11 @@ def load_and_preprocess_audio(wav_bytes, target_sr=16000):
         audio_tensor = torchaudio.transforms.Resample(sr, target_sr)(audio_tensor)
     if audio_tensor.shape[0] > 1:
         audio_tensor = audio_tensor[:1, :]
+        
+    # Apply noise reduction
+    audio_np = audio_tensor.squeeze().numpy()
+    reduced_noise = nr.reduce_noise(y=audio_np, sr=target_sr)
+    audio_tensor = torch.tensor(reduced_noise).unsqueeze(0)
     return audio_tensor, target_sr
 
 def analyze_emotion(audio_tensor, sr):
