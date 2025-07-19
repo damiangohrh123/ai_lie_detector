@@ -1,168 +1,67 @@
-import React, { useState, useRef, useEffect } from "react";
-
-const emotionColors = {
-  neu: '#9E9E9E',
-  hap: '#FFD700',
-  sad: '#2196F3',
-  ang: '#F44336'
-};
-
-const emotionFullNames = {
-  neu: "Neutral",
-  hap: "Happy",
-  sad: "Sad",
-  ang: "Angry"
-};
+import React, { useEffect, useRef, useState } from "react";
 
 export default function VoiceRecorder({ setVoiceResults }) {
-  const [results, setResults] = useState([]);
-  const mediaRecorderRef = useRef(null);
+  const [transcript, setTranscript] = useState("");
+  const [emotion, setEmotion] = useState({});
+  const wsRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const processorRef = useRef(null);
   const streamRef = useRef(null);
-
-  const segmentDuration = 3000; // 3 Seconds
 
   useEffect(() => {
     let isCancelled = false;
 
     const start = async () => {
-      try {
-        // Get user's microphone stream
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false,
-        });
-
-        // Store the stream and start recording the next chunk
-        streamRef.current = stream;
-        recordNextChunk();
-
-      } catch (err) {
-        console.error("Error accessing microphone:", err);
-      }
-    };
-
-    const recordNextChunk = () => {
-      // Check if the recording is cancelled or the stream is not available
-      if (isCancelled || !streamRef.current) return;
-
-      // Create media recorder with WebM/Opus audio format
-      const mediaRecorder = new MediaRecorder(streamRef.current, { mimeType: "audio/webm;codecs=opus" });
-      mediaRecorderRef.current = mediaRecorder;
-      let chunks = [];
-
-      // When data is available, add it to the chunks array
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
+      // Open WebSocket connection
+      wsRef.current = new window.WebSocket("ws://localhost:5000/ws/stream");
+      wsRef.current.binaryType = "arraybuffer";
+      wsRef.current.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        setTranscript(data.transcript || "");
+        setEmotion(data.emotion || {});
+        if (setVoiceResults) setVoiceResults([{ text: data.transcript, emotion: data.emotion }]);
       };
 
-      /**
-       * When the recording is stopped, send the chunks to the server.
-       * Sends audio chunks to /analyze-voice API endpoint.
-       * Appends emotions and transcript to results
-       * Starts the next recording immediately.
-       */
-      mediaRecorder.onstop = async () => {
-        if (chunks.length > 0) {
-          const fd = new FormData();
-          chunks.forEach((b, i) => fd.append("audioFiles", b, `chunk_${i}.webm`));
-          try {
-            const res = await fetch("http://localhost:5000/analyze-voice", {
-              method: "POST",
-              body: fd,
-            });
-            const data = await res.json();
-            setResults((prev) => [...prev, ...data]);
-          } catch (err) {
-            console.error("Error sending audio to server:", err);
-          }
-        }
-        setTimeout(recordNextChunk, 0);
+      // Get user's microphone stream
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      streamRef.current = stream;
+      audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const source = audioCtxRef.current.createMediaStreamSource(stream);
+
+      // ScriptProcessorNode is deprecated but still widely supported
+      const processor = audioCtxRef.current.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (e) => {
+        if (!wsRef.current || wsRef.current.readyState !== 1) return;
+        const input = e.inputBuffer.getChannelData(0); // Float32Array
+        // Send as raw float32 PCM
+        wsRef.current.send(input.buffer);
       };
 
-      // Start recording the next chunk (3 seconds)
-      mediaRecorder.start();
-      setTimeout(() => {
-        if (mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
-        }
-      }, segmentDuration);
+      source.connect(processor);
+      processor.connect(audioCtxRef.current.destination);
     };
 
     start();
 
-    // Cleanup function to stop the recording and release the stream
+    // Cleanup
     return () => {
       isCancelled = true;
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      if (wsRef.current) wsRef.current.close();
+      if (processorRef.current) processorRef.current.disconnect();
+      if (audioCtxRef.current) audioCtxRef.current.close();
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [setVoiceResults]);
 
-  // Notify parent of transcript changes
-  useEffect(() => {
-    if (setVoiceResults) {
-      setVoiceResults(results);
-    }
-  }, [results, setVoiceResults]);
-
-  // Aggregate emotion results
-  const emotionSums = {};
-  results.forEach((result) => { // Loop through each result
-    const emotions = result.emotion || {};
-  
-    // Loop through each emotion and add to the running total
-    Object.entries(emotions).forEach(([emotionLabel, value]) => {
-      if (!emotionSums[emotionLabel]) {
-        emotionSums[emotionLabel] = 0;
-      }
-      emotionSums[emotionLabel] += value;
-    });
-  });
-
-  // Get the number of audio segments processed (avoid divide-by-zero)
-  const numberOfChunks = results.length || 1;
-
-  // Calculate average emotion percentages
-  const averageEmotions = [];
-  for (const [emotionLabel, totalValue] of Object.entries(emotionSums)) {
-    const average = (totalValue / numberOfChunks) * 100;
-    averageEmotions.push({
-      emotion: emotionLabel,
-      probability: parseFloat(average.toFixed(1)), // round to 1 decimal
-    });
-  }
-
-  // Sort emotions by highest probability
-  averageEmotions.sort((a, b) => b.probability - a.probability);
-
-  // Keep only the top 4 emotions
-  const topEmotions = averageEmotions.slice(0, 4);
-
+  // UI: Show transcript and emotion
   return (
-      <div className="emotion-bar-graph">
-        {['neu', 'hap', 'sad', 'ang'].map((emotion) => {
-          const match = topEmotions.find(e => e.emotion === emotion);
-          const probability = match ? match.probability : 0;
-          return (
-            <div className="bar-container" key={emotion}>
-              <div className="bar"
-                style={{
-                  height: `${probability * 1.5}px`,
-                  backgroundColor: emotionColors[emotion] || '#007bff'
-                }}
-              />
-              <div className="bar-label">
-                {emotionFullNames[emotion]}<br />{probability}%
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <div>
+      <h3>Live Transcript</h3>
+      <div style={{ minHeight: 40, border: "1px solid #ccc", padding: 8 }}>{transcript}</div>
+      <h3>Live Emotion</h3>
+      <pre>{JSON.stringify(emotion, null, 2)}</pre>
+    </div>
   );
-};
+}
