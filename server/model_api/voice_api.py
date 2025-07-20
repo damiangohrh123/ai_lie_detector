@@ -5,6 +5,7 @@ import wave
 import base64
 import torch
 import torchaudio
+import numpy as np
 
 # Import Wav2Vec2 model
 from transformers import (
@@ -50,9 +51,14 @@ def load_and_preprocess_audio(wav_bytes, target_sr=16000):
     if audio_tensor.shape[0] > 1:
         audio_tensor = audio_tensor[:1, :]
         
-    # Apply noise reduction
+    # Apply normalization
     audio_np = audio_tensor.squeeze().numpy()
-    reduced_noise = nr.reduce_noise(y=audio_np, sr=target_sr)
+    max_val = np.max(np.abs(audio_np))
+    if max_val > 0:
+        audio_np = audio_np / max_val
+
+    # Apply noise reduction
+    reduced_noise = nr.reduce_noise(y=audio_np, sr=target_sr,  prop_decrease=0.5)
     audio_tensor = torch.tensor(reduced_noise).unsqueeze(0)
 
     return audio_tensor, target_sr
@@ -160,6 +166,8 @@ async def analyze(request: Request):
 
         # Runs VAD on audio tensor
         speech_segments = vad(audio_tensor, sr)
+        if not speech_segments:
+            print("VAD: No speech detected in this audio chunk. Skipping analysis.")
         audio_np = audio_tensor.squeeze().numpy()
 
         # Loop over detected speech segments
