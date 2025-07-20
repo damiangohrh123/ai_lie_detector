@@ -16,6 +16,7 @@ from transformers import (
 from vosk import Model as VoskModel, KaldiRecognizer
 import json
 import noisereduce as nr
+import webrtcvad
 
 app = FastAPI()
 
@@ -101,17 +102,83 @@ def transcribe_audio_vosk(audio_tensor, sr):
     # Remove leading and trailing spaces, and capitlalize first letter.
     return result.strip().capitalize()
 
+def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=2):
+    # Creates a VAD object
+    vad = webrtcvad.Vad(aggressiveness)
+
+    # squeeze() to remove extra dimensions. Converts from float32 to int16.
+    audio = audio_tensor.squeeze().numpy()
+    audio_pcm = (audio * 32767.0).astype('int16')
+
+    # Calculates frame size and number of frames.
+    frame_size = int(sr * frame_duration_ms / 1000)
+    num_frames = len(audio_pcm) // frame_size
+
+    segments = [] # Store start_time and end_time of speech
+    triggered = False # Boolean flag to track if we are currently in a speech segment
+    start_idx = 0
+
+    # Loop through each frame,
+    for i in range(num_frames):
+        start = i * frame_size
+        end = start + frame_size
+        frame = audio_pcm[start:end]
+
+        # Handle incomplete frames
+        if len(frame) < frame_size:
+            break
+
+        # Check if current frame contains speech
+        is_speech = vad.is_speech(frame.tobytes(), sr)
+
+        # If speech detected and currently not in speech segment, mark start of speech.
+        if is_speech and not triggered:
+            triggered = True
+            start_idx = start
+
+        # If no speech detected and currently in speech segment, mark end of speech.
+        elif not is_speech and triggered:
+            triggered = False
+            segments.append((start_idx / sr, end / sr))
+
+    # If end of audio is reached and no silence detected after speech started, assume speech lasted entire duration.
+    if triggered:
+        segments.append((start_idx / sr, len(audio_pcm) / sr))
+    return [(round(s, 2), round(e, 2)) for s, e in segments]
+
 @app.post("/analyze")
 async def analyze(request: Request):
     data = await request.json()
     results = []
+
+    # Loop over audio clips
     for b64 in data.get("wav_buffers", []):
+
+        # Decode base64 audio into raw bytes, then convert to audio tensor and sample rate.
         wav_bytes = base64.b64decode(b64)
         audio_tensor, sr = load_and_preprocess_audio(wav_bytes)
-        emotion = analyze_emotion(audio_tensor, sr)
-        text = transcribe_audio_vosk(audio_tensor, sr)
-        results.append({
-            "text": text,
-            "emotion": emotion
-        })
+
+        # Runs VAD on audio tensor
+        speech_segments = vad(audio_tensor, sr)
+        audio_np = audio_tensor.squeeze().numpy()
+
+        # Loop over detected speech segments
+        for s, e in speech_segments:
+            start_idx = int(s * sr)
+            end_idx = int(e * sr)
+            segment_np = audio_np[start_idx:end_idx]
+
+            # Skip over empty segments
+            if len(segment_np) == 0:
+                continue
+
+            segment_tensor = torch.tensor(segment_np).unsqueeze(0)
+            emotion = analyze_emotion(segment_tensor, sr) # Emotion sentiment analysis.
+            text = transcribe_audio_vosk(segment_tensor, sr) # Text transcription using Vosk.
+            results.append({
+                "start": s,
+                "end": e,
+                "emotion": emotion,
+                "text": text
+            })
     return results
