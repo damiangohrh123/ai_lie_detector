@@ -14,93 +14,143 @@ const emotionFullNames = {
   ang: "Angry"
 };
 
+// Environment-based WebSocket URL
+const WS_URL = process.env.NODE_ENV === 'production' 
+  ? process.env.REACT_APP_WS_URL || "wss://render-app.onrender.com/ws/audio"
+  : "ws://localhost:8000/ws/audio";
+
+const MAX_RESULTS = 10; // Keep only last 10 results
+const RECONNECT_DELAY = 3000; // 3 seconds
+
 export default function VoiceRecorder({ setVoiceResults }) {
   const [results, setResults] = useState([]);
-  const mediaRecorderRef = useRef(null);
-  const streamRef = useRef(null);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'connecting', 'connected', 'disconnected', 'error'
+  const [isProcessing, setIsProcessing] = useState(false);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
 
-  const segmentDuration = 3000; // 3 Seconds
+  const connectWebSocket = () => {
+    // If WebSocket is already connected, do nothing. This is to avoid creatng multiple websocket connections.
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    setConnectionStatus('connecting');
+
+    // Create a new WebSocket connection
+    wsRef.current = new WebSocket(WS_URL);
+    wsRef.current.binaryType = "arraybuffer";
+
+    // When connection opens, set status to 'connected', and reset reconnect attempts.
+    wsRef.current.onopen = () => {
+      console.log("WebSocket connected to backend");
+      setConnectionStatus('connected');
+      reconnectAttemptsRef.current = 0;
+    };
+
+    // Handle errors and set connection status to 'error'
+    wsRef.current.onerror = (err) => {
+      console.error("WebSocket error:", err);
+      setConnectionStatus('error');
+    };
+
+    // Handle connection close and set status to 'disconnected'.
+    wsRef.current.onclose = () => {
+      console.log("WebSocket closed");
+      setConnectionStatus('disconnected');
+      
+      // Auto-reconnect with increasing delays after each attempt.
+      if (reconnectAttemptsRef.current < 5) {
+        const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectAttemptsRef.current++;
+          connectWebSocket();
+        }, delay);
+      }
+    };
+
+    // Handle incoming messages from backend.
+    wsRef.current.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Received from backend:", data);
+        
+        // Skip empty results or results with no meaningful content.
+        if (!data.text?.trim() && (!data.emotion || Object.values(data.emotion).every(v => v < 0.1))) {
+          return;
+        }
+        
+        // Mark processing as complete
+        setIsProcessing(false);
+
+        // Add new results to end of the results array, and keep only the last MAX_RESULTS
+        setResults((prev) => {
+          const newResults = [...prev, data];
+          return newResults.slice(-MAX_RESULTS);
+        });
+      } catch (e) {
+        console.warn("Failed to parse WebSocket message:", e);
+      }
+    };
+  };
 
   useEffect(() => {
+    let audioContext, input, stream, workletNode;
     let isCancelled = false;
 
-    const start = async () => {
+    const startStreaming = async () => {
       try {
-        // Get user's microphone stream
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false,
-        });
+        // Connect WebSocket first.
+        connectWebSocket();
 
-        // Store the stream and start recording the next chunk
-        streamRef.current = stream;
-        recordNextChunk();
+        // Access microphone.
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Create audio context for processing audio.
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        input = audioContext.createMediaStreamSource(stream);
 
-      } catch (err) {
-        console.error("Error accessing microphone:", err);
+        // Load the audio worklet processor for PCM conversion.
+        await audioContext.audioWorklet.addModule('/pcm-processor.js');
+        workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
+
+        // Now mic groes through the worklet node.
+        input.connect(workletNode);
+
+        // Everytime the worklet node receives audio data, this function runs.
+        workletNode.port.onmessage = (event) => {
+          if (isCancelled) return;
+          const inputData = event.data;
+          
+          // Convert Float32Array [-1,1] to Int16 PCM
+          const pcm = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            pcm[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
+          }
+          
+          // If websocket is connected, send the PCM data to backend over websocket.
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(pcm.buffer);
+            setIsProcessing(true);
+          }
+        };
+      } catch (error) {
+        console.error("Failed to start audio streaming:", error);
+        setConnectionStatus('error');
       }
     };
 
-    const recordNextChunk = () => {
-      // Check if the recording is cancelled or the stream is not available
-      if (isCancelled || !streamRef.current) return;
+    startStreaming();
 
-      // Create media recorder with WebM/Opus audio format
-      const mediaRecorder = new MediaRecorder(streamRef.current, { mimeType: "audio/webm;codecs=opus" });
-      mediaRecorderRef.current = mediaRecorder;
-      let chunks = [];
-
-      // When data is available, add it to the chunks array
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
-      };
-
-      /**
-       * When the recording is stopped, send the chunks to the server.
-       * Sends audio chunks to /analyze-voice API endpoint.
-       * Appends emotions and transcript to results
-       * Starts the next recording immediately.
-       */
-      mediaRecorder.onstop = async () => {
-        if (chunks.length > 0) {
-          const fd = new FormData();
-          chunks.forEach((b, i) => fd.append("audioFiles", b, `chunk_${i}.webm`));
-          try {
-            const res = await fetch("http://localhost:5000/analyze-voice", {
-              method: "POST",
-              body: fd,
-            });
-            const data = await res.json();
-            setResults((prev) => [...prev, ...data]);
-          } catch (err) {
-            console.error("Error sending audio to server:", err);
-          }
-        }
-        setTimeout(recordNextChunk, 0);
-      };
-
-      // Start recording the next chunk (3 seconds)
-      mediaRecorder.start();
-      setTimeout(() => {
-        if (mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
-        }
-      }, segmentDuration);
-    };
-
-    start();
-
-    // Cleanup function to stop the recording and release the stream
+    // Cleanup function to stop audio processing and close WebSocket connection.
     return () => {
       isCancelled = true;
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      if (input) input.disconnect();
+      if (workletNode) workletNode.disconnect();
+      if (audioContext) audioContext.close();
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
@@ -111,12 +161,10 @@ export default function VoiceRecorder({ setVoiceResults }) {
     }
   }, [results, setVoiceResults]);
 
-  // Aggregate emotion results
+  // Sum up emotions from all results to perform averaging.
   const emotionSums = {};
-  results.forEach((result) => { // Loop through each result
+  results.forEach((result) => {
     const emotions = result.emotion || {};
-  
-    // Loop through each emotion and add to the running total
     Object.entries(emotions).forEach(([emotionLabel, value]) => {
       if (!emotionSums[emotionLabel]) {
         emotionSums[emotionLabel] = 0;
@@ -125,36 +173,49 @@ export default function VoiceRecorder({ setVoiceResults }) {
     });
   });
 
-  // Get the number of audio segments processed (avoid divide-by-zero)
+  // Calculate average emotions based on the number of results.
   const numberOfChunks = results.length || 1;
-
-  // Calculate average emotion percentages
   const averageEmotions = [];
   for (const [emotionLabel, totalValue] of Object.entries(emotionSums)) {
     const average = (totalValue / numberOfChunks) * 100;
     averageEmotions.push({
       emotion: emotionLabel,
-      probability: parseFloat(average.toFixed(1)), // round to 1 decimal
+      probability: parseFloat(average.toFixed(1)),
     });
   }
 
-  // Sort emotions by highest probability
-  averageEmotions.sort((a, b) => b.probability - a.probability);
-
-  // Keep only the top 4 emotions
-  const topEmotions = averageEmotions.slice(0, 4);
+  // Display connection status in the UI.
+  const getConnectionStatusDisplay = () => {
+    switch (connectionStatus) {
+      case 'connecting':
+        return 'Connecting...';
+      case 'connected':
+        return isProcessing ? '🎤 Processing speech...' : '🟢 Connected - Listening';
+      case 'error':
+        return '❌ Connection error';
+      case 'disconnected':
+        return '🔴 Disconnected - Reconnecting...';
+      default:
+        return 'Unknown status';
+    }
+  };
 
   return (
+    <div>
+      <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+        {getConnectionStatusDisplay()}
+      </div>
       <div className="emotion-bar-graph">
         {['neu', 'hap', 'sad', 'ang'].map((emotion) => {
-          const match = topEmotions.find(e => e.emotion === emotion);
+          const match = averageEmotions.find(e => e.emotion === emotion);
           const probability = match ? match.probability : 0;
           return (
             <div className="bar-container" key={emotion}>
               <div className="bar"
                 style={{
                   height: `${probability * 1.5}px`,
-                  backgroundColor: emotionColors[emotion] || '#007bff'
+                  backgroundColor: emotionColors[emotion] || '#007bff',
+                  opacity: connectionStatus === 'connected' ? 1 : 0.5
                 }}
               />
               <div className="bar-label">
@@ -164,5 +225,11 @@ export default function VoiceRecorder({ setVoiceResults }) {
           );
         })}
       </div>
+      {results.length > 0 && (
+        <div style={{ marginTop: '15px', fontSize: '12px', color: '#888' }}>
+          Results: {results.length}/{MAX_RESULTS} (showing recent)
+        </div>
+      )}
+    </div>
   );
-};
+}
