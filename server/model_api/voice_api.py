@@ -1,5 +1,4 @@
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, WebSocket
 import io
 import wave
 import os
@@ -20,19 +19,7 @@ import noisereduce as nr
 import webrtcvad
 import asyncio
 
-app = FastAPI()
-
-# CORS configuration
-allowed_origins = ["*"] if os.getenv("ENVIRONMENT") == "development" else [
-    "https://vercel-app.vercel.app",  # Replace with actual Vercel domain later
-    "http://localhost:3000",  # For local development
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-)
+router = APIRouter()
 
 # Load Wav2Vec2 model once on startup
 emotion_model = Wav2Vec2ForSequenceClassification.from_pretrained("superb/wav2vec2-base-superb-er")
@@ -97,7 +84,7 @@ def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=2):
         segments.append((start_idx / sr, len(audio_pcm) / sr))
     return [(round(s, 2), round(e, 2)) for s, e in segments]
 
-@app.get("/health")
+@router.get("/health")
 async def health_check():
     """Health check endpoint for Render monitoring"""
     try:
@@ -117,7 +104,7 @@ async def health_check():
             "error": str(e)
         }
 
-@app.get("/")
+@router.get("/")
 async def root():
     """Root endpoint"""
     return {
@@ -129,7 +116,7 @@ async def root():
         }
     }
 
-@app.websocket("/ws/audio")
+@router.websocket("/ws/audio")
 async def websocket_audio(websocket: WebSocket):
     await websocket.accept()
     sample_rate = 16000
