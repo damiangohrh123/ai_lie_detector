@@ -5,6 +5,20 @@ html, body, #root {
   overflow: hidden;
 }
 
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
 .app-layout {
   display: flex;
   flex-direction: row;
@@ -62,7 +76,7 @@ html, body, #root {
   flex: 1;
 }
 
-.emotion-bar-graph {
+.face-emotion-bar-graph {
   flex: 2;
   display: flex;
   gap: 40px;
@@ -70,16 +84,37 @@ html, body, #root {
   transition: height 0.5s ease;
 }
 
-.bar-container {
+.face-bar-container {
   width: 40px;
 }
 
-.bar {
+.face-bar {
   transition: height 0.5s ease;
   border-top-left-radius: 5px;
   border-top-right-radius: 5px;
 }
 
-.bar-label {
+.voice-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 2;
+}
 
+.voice-emotion-bar-graph {
+  flex: 2;
+  display: flex;
+  gap: 40px;
+  align-items: flex-end;
+  transition: height 0.5s ease;
+}
+
+.voice-bar-container {
+  width: 40px;
+}
+
+.voice-bar {
+  transition: height 0.5s ease;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
 }

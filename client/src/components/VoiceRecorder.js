@@ -181,14 +181,14 @@ export default function VoiceRecorder({ setVoiceResults }) {
   };
 
   return (
-    <div>
+    <div className="voice-container">
       <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
         {getConnectionStatusDisplay()}
       </div>
-      <div className="emotion-bar-graph">
+      <div className="voice-emotion-bar-graph">
         {['neu', 'hap', 'sad', 'ang'].map((emotion) => (
-          <div className="bar-container" key={emotion}>
-            <div className="bar"
+          <div className="voice-bar-container" key={emotion}>
+            <div className="voice-bar"
               style={{
                 height: `${getAvgEmotion(emotion) * 1.5}px`,
                 backgroundColor: emotionColors[emotion] || '#007bff',
