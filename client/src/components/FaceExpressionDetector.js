@@ -47,6 +47,10 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
       // Make sure video is playing
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
 
+      // Always clear the canvas before drawing
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
       // Detect facial expression
       const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
 
