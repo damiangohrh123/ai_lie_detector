@@ -9,7 +9,7 @@ export default function App() {
   const [faceEmotions, setFaceEmotions] = useState([]);
   const [voiceResults, setVoiceResults] = useState([]);
     // Aggregate transcript
-    const transcript = voiceResults.map(r => r.text).join(' ');
+    const transcript = voiceResults.slice(-3).map(r => r.text).join(' ');
 
   return (
     <div className="app-layout">

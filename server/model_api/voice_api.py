@@ -1,9 +1,8 @@
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import io
 import wave
 import os
-import base64
 import torch
 import torchaudio
 import numpy as np
@@ -53,42 +52,6 @@ def analyze_emotion(audio_tensor, sr):
 
     # Returns a dictionary. E.g. { "ang": 0.02, "hap": 0.87, "neu": 0.05, "sad": 0.06 }
     return {label: round(float(probs[i]), 4) for i, label in enumerate(emotion_labels)}
-
-def transcribe_audio_vosk(audio_tensor, sr):
-    # Convert to int16. Scale by 32767 to 16-bit scale.
-    audio_tensor = (audio_tensor * 32767.0).clamp(-32768, 32767).to(torch.int16)
-
-    # Create a RAM buffer using `io.BytesIO()`
-    # Save the audio tensor into this buffer. and reset buffer point to 0 so it can be read like a file.
-    wav_buffer = io.BytesIO()
-    torchaudio.save(wav_buffer, audio_tensor, sr, format='wav')
-    wav_buffer.seek(0)
-
-    # Open the wav stored in the buffer so we can read it. "rb" = read binary mode.
-    wf = wave.open(wav_buffer, "rb")
-
-    # Creates a Vosk recognizer instance.
-    rec = KaldiRecognizer(vosk_model, sr)
-
-    # Reads the audio file and appends the recognized text to result.
-    result = ""
-    while True:
-        data = wf.readframes(4000)
-        if len(data) == 0:
-            break
-        if rec.AcceptWaveform(data):
-            res = json.loads(rec.Result())
-            result += res.get("text", "") + " "
-
-    # Get final chunk of transcribed text. Vosk might hold onto remaining text. Add it to results.
-    res = json.loads(rec.FinalResult())
-    result += res.get("text", "")
-
-    # Close the wav file.
-    wf.close()
-
-    # Remove leading and trailing spaces, and capitlalize first letter.
-    return result.strip().capitalize()
 
 def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=2):
     # Creates a VAD object
@@ -169,88 +132,62 @@ async def root():
 @app.websocket("/ws/audio")
 async def websocket_audio(websocket: WebSocket):
     await websocket.accept()
-    buffer = bytearray() # Buffer to accumulate incoming audio data
     sample_rate = 16000
-    chunk_size = int(1.5 * sample_rate) # Process in 1.5 second chunks (24000 samples)
-    max_buffer_size = int(10 * sample_rate * 2)  # 10 seconds max buffer (2 bytes per int16)
+    recognizer = KaldiRecognizer(vosk_model, sample_rate) # Creates a Vosk recognizer instance
+    audio_buffer = bytearray()  # Buffer for sliding window (voice sentiment)
+    window_seconds = 2 # 2 seconds window size for emotion analysis
+    window_size = window_seconds * sample_rate * 2  # 2 bytes per int16 sample
+    stop_task = False
+
+    async def perform_voice_sentiment():
+        while not stop_task:
+            if len(audio_buffer) >= window_size:
+                # Get the most recent window_size bytes
+                window_bytes = audio_buffer[-window_size:]
+                audio_np = np.frombuffer(window_bytes, dtype=np.int16).astype(np.float32) / 32767.0
+                segment_tensor = torch.tensor(audio_np).unsqueeze(0)
+                try:
+                    # Run VAD to check for speech
+                    speech_segments = vad(segment_tensor, sample_rate, aggressiveness=3)
+                    if speech_segments:
+                        emotion = analyze_emotion(segment_tensor, sample_rate)
+                        await websocket.send_text(json.dumps({
+                            "type": "voice_sentiment",
+                            "emotion": emotion
+                        }))
+                except Exception as e:
+                    print(f"Voice sentiment error: {e}")
+            await asyncio.sleep(1)
+
+    voice_sentiment_task = asyncio.create_task(perform_voice_sentiment())
     
     try:
         while True:
             data = await websocket.receive_bytes()
-            
-            # Prevent buffer overflow
-            if len(buffer) > max_buffer_size:
-                buffer = buffer[-chunk_size * 2:]  # Keep only last chunk worth of data
-            
-            # Append new data to buffer
-            buffer.extend(data)
-            
-            # Loop keeps running if buffer has at least 1.5 seconds of audio.
-            while len(buffer) >= chunk_size * 2:  # 2 bytes per int16
-                chunk = buffer[:chunk_size * 2] # Get the first 1.5 seconds (in bytes) from the buffer
-                buffer = buffer[chunk_size * 2:] # Remove processed chunk from buffer
+            audio_buffer.extend(data)
 
-                # Convert bytes to numpy array, then normalize to float32
-                audio_np = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32767.0
+            # Keep buffer at most window_size * 2 (for safety)
+            if len(audio_buffer) > window_size * 2:
+                audio_buffer = audio_buffer[-window_size * 2:]
 
-                # Apply noise reduction
-                audio_np = nr.reduce_noise(y=audio_np, sr=sample_rate, prop_decrease=1)
-                
-                # Convert to tensor for compatibility
-                segment_tensor = torch.tensor(audio_np).unsqueeze(0)
-                
-                # Run VAD 
-                speech_segments = vad(segment_tensor, sample_rate, aggressiveness=1)
-                
-                if not speech_segments:
-                    print("VAD: No speech detected in this audio chunk. Skipping analysis.")
-                    continue
-                
-                print(f"VAD: Detected speech segments: {speech_segments}")
-                
-                for s, e in speech_segments:
-                    start_idx = int(s * sample_rate)
-                    end_idx = int(e * sample_rate)
-                    seg_np = audio_np[start_idx:end_idx]
-                    
-                    if len(seg_np) == 0:
-                        continue
-                    
-                    # Skip very short segments (less than 0.3 seconds)
-                    if len(seg_np) < int(0.3 * sample_rate):
-                        print(f"Skipping short segment: {len(seg_np)/sample_rate:.2f}s")
-                        continue
-                    
-                    seg_tensor = torch.tensor(seg_np).unsqueeze(0)
-                    
-                    try:
-                        emotion = analyze_emotion(seg_tensor, sample_rate)
-                        text = transcribe_audio_vosk(seg_tensor, sample_rate)
-                        
-                        # Skip results with very low confidence or empty text
-                        max_emotion_confidence = max(emotion.values()) if emotion else 0
-                        if max_emotion_confidence < 0.1 and not text.strip():
-                            print("Skipping low-confidence result")
-                            continue
-                        
-                        result = {
-                            "start": round(s, 2),
-                            "end": round(e, 2),
-                            "emotion": emotion,
-                            "text": text.strip(),
-                            "confidence": round(max_emotion_confidence, 3)
-                        }
-                        
-                        print("Sending result:", result)
-                        await websocket.send_text(json.dumps(result))
-                        
-                    except Exception as processing_error:
-                        print(f"Error processing segment: {processing_error}")
-                        continue
-                        
+            # Feed data directly to Vosk recognizer
+            if recognizer.AcceptWaveform(data):
+                result = json.loads(recognizer.Result())
+                final_text = result.get("text", "")
+
+                # Text sentiment analysis (placeholder: just send the text)
+                await websocket.send_text(json.dumps({
+                    "type": "text_sentiment",
+                    "text": final_text
+                }))
+            else:
+                partial = json.loads(recognizer.PartialResult())
+                await websocket.send_text(json.dumps({
+                    "type": "partial",
+                    "text": partial.get("partial", "")
+                }))
     except Exception as e:
         print("WebSocket closed or error:", e)
-        try:
-            await websocket.close()
-        except:
-            pass
+    finally:
+        stop_task = True
+        await voice_sentiment_task

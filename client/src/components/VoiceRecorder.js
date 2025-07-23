@@ -19,17 +19,20 @@ const WS_URL = process.env.NODE_ENV === 'production'
   ? process.env.REACT_APP_WS_URL || "wss://render-app.onrender.com/ws/audio"
   : "ws://localhost:8000/ws/audio";
 
-const MAX_RESULTS = 10; // Keep only last 10 results
-const RECONNECT_DELAY = 3000; // 3 seconds
+const TRANSCRIPT_WINDOW = 3;
+const RECONNECT_DELAY = 3000;
+const MOVING_AVG_WINDOW = 3;
 
 export default function VoiceRecorder({ setVoiceResults }) {
   const [results, setResults] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'connecting', 'connected', 'disconnected', 'error'
   const [isProcessing, setIsProcessing] = useState(false);
+  const [voiceEmotionHistory, setVoiceEmotionHistory] = useState([]);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
 
+  // WebSocket connection and message handling
   const connectWebSocket = () => {
     // If WebSocket is already connected, do nothing. This is to avoid creatng multiple websocket connections.
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -45,13 +48,7 @@ export default function VoiceRecorder({ setVoiceResults }) {
       setConnectionStatus('connected');
       reconnectAttemptsRef.current = 0;
     };
-
-    // Handle errors and set connection status to 'error'
-    wsRef.current.onerror = (err) => {
-      console.error("WebSocket error:", err);
-      setConnectionStatus('error');
-    };
-
+    wsRef.current.onerror = () => setConnectionStatus('error');
     // Handle connection close and set status to 'disconnected'.
     wsRef.current.onclose = () => {
       console.log("WebSocket closed");
@@ -71,21 +68,25 @@ export default function VoiceRecorder({ setVoiceResults }) {
     wsRef.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("Received from backend:", data);
-        
-        // Skip empty results or results with no meaningful content.
-        if (!data.text?.trim() && (!data.emotion || Object.values(data.emotion).every(v => v < 0.1))) {
-          return;
+        if (data.type !== "partial") {
+          console.log("Received from backend:", data);
         }
-        
-        // Mark processing as complete
-        setIsProcessing(false);
 
-        // Add new results to end of the results array, and keep only the last MAX_RESULTS
-        setResults((prev) => {
-          const newResults = [...prev, data];
-          return newResults.slice(-MAX_RESULTS);
-        });
+        // Only process final text segments for transcript
+        if (data.type === "text_sentiment" && data.text && data.text.trim()) {
+          setResults(prev => {
+            const newResults = [...prev, data];
+            return newResults.slice(-TRANSCRIPT_WINDOW);
+          });
+        }
+
+        // Handle voice sentiment for emotion bars
+        if (data.type === "voice_sentiment" && data.emotion) {
+          setVoiceEmotionHistory(prev => {
+            const updated = [...prev, data.emotion];
+            return updated.slice(-MOVING_AVG_WINDOW);
+          });
+        }
       } catch (e) {
         console.warn("Failed to parse WebSocket message:", e);
       }
@@ -95,7 +96,7 @@ export default function VoiceRecorder({ setVoiceResults }) {
   useEffect(() => {
     let audioContext, input, stream, workletNode;
     let isCancelled = false;
-
+    
     const startStreaming = async () => {
       try {
         // Connect WebSocket first.
@@ -143,61 +144,40 @@ export default function VoiceRecorder({ setVoiceResults }) {
     // Cleanup function to stop audio processing and close WebSocket connection.
     return () => {
       isCancelled = true;
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (input) input.disconnect();
       if (workletNode) workletNode.disconnect();
       if (audioContext) audioContext.close();
-      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (stream) stream.getTracks().forEach(t => t.stop());
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
   // Notify parent of transcript changes
   useEffect(() => {
-    if (setVoiceResults) {
-      setVoiceResults(results);
-    }
+    if (setVoiceResults) setVoiceResults(results);
   }, [results, setVoiceResults]);
 
-  // Sum up emotions from all results to perform averaging.
-  const emotionSums = {};
-  results.forEach((result) => {
-    const emotions = result.emotion || {};
-    Object.entries(emotions).forEach(([emotionLabel, value]) => {
-      if (!emotionSums[emotionLabel]) {
-        emotionSums[emotionLabel] = 0;
-      }
-      emotionSums[emotionLabel] += value;
-    });
-  });
-
-  // Calculate average emotions based on the number of results.
-  const numberOfChunks = results.length || 1;
-  const averageEmotions = [];
-  for (const [emotionLabel, totalValue] of Object.entries(emotionSums)) {
-    const average = (totalValue / numberOfChunks) * 100;
-    averageEmotions.push({
-      emotion: emotionLabel,
-      probability: parseFloat(average.toFixed(1)),
-    });
-  }
-
-  // Display connection status in the UI.
   const getConnectionStatusDisplay = () => {
     switch (connectionStatus) {
-      case 'connecting':
-        return 'Connecting...';
-      case 'connected':
-        return isProcessing ? '🎤 Processing speech...' : '🟢 Connected - Listening';
-      case 'error':
-        return '❌ Connection error';
-      case 'disconnected':
-        return '🔴 Disconnected - Reconnecting...';
-      default:
-        return 'Unknown status';
+      case 'connecting': return 'Connecting...';
+      case 'connected': return isProcessing ? '🎤 Processing speech...' : '🟢 Connected';
+      case 'error': return '❌ Connection error';
+      case 'disconnected': return '🔴 Disconnected - Reconnecting...';
+      default: return 'Unknown status';
     }
+  };
+
+  // Moving average for emotion bars
+  const getAvgEmotion = (emotion) => {
+    let sum = 0, count = 0;
+    voiceEmotionHistory.forEach(e => {
+      if (e[emotion] !== undefined) {
+        sum += e[emotion];
+        count++;
+      }
+    });
+    return count > 0 ? (sum / count) * 100 : 0;
   };
 
   return (
@@ -206,30 +186,21 @@ export default function VoiceRecorder({ setVoiceResults }) {
         {getConnectionStatusDisplay()}
       </div>
       <div className="emotion-bar-graph">
-        {['neu', 'hap', 'sad', 'ang'].map((emotion) => {
-          const match = averageEmotions.find(e => e.emotion === emotion);
-          const probability = match ? match.probability : 0;
-          return (
-            <div className="bar-container" key={emotion}>
-              <div className="bar"
-                style={{
-                  height: `${probability * 1.5}px`,
-                  backgroundColor: emotionColors[emotion] || '#007bff',
-                  opacity: connectionStatus === 'connected' ? 1 : 0.5
-                }}
-              />
-              <div className="bar-label">
-                {emotionFullNames[emotion]}<br />{probability}%
-              </div>
+        {['neu', 'hap', 'sad', 'ang'].map((emotion) => (
+          <div className="bar-container" key={emotion}>
+            <div className="bar"
+              style={{
+                height: `${getAvgEmotion(emotion) * 1.5}px`,
+                backgroundColor: emotionColors[emotion] || '#007bff',
+                opacity: connectionStatus === 'connected' ? 1 : 0.5
+              }}
+            />
+            <div className="bar-label">
+              {emotionFullNames[emotion]}<br />{getAvgEmotion(emotion).toFixed(1)}%
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
-      {results.length > 0 && (
-        <div style={{ marginTop: '15px', fontSize: '12px', color: '#888' }}>
-          Results: {results.length}/{MAX_RESULTS} (showing recent)
-        </div>
-      )}
     </div>
   );
 }
