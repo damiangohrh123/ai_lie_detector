@@ -23,8 +23,9 @@ const TRANSCRIPT_WINDOW = 3;
 const RECONNECT_DELAY = 3000;
 const MOVING_AVG_WINDOW = 3;
 
-export default function VoiceRecorder({ setVoiceResults }) {
+export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory }) {
   const [results, setResults] = useState([]);
+  const [transcriptHistory, setTranscriptHistoryState] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'connecting', 'connected', 'disconnected', 'error'
   const [isProcessing, setIsProcessing] = useState(false);
   const [voiceEmotionHistory, setVoiceEmotionHistory] = useState([]);
@@ -77,6 +78,12 @@ export default function VoiceRecorder({ setVoiceResults }) {
           setResults(prev => {
             const newResults = [...prev, data];
             return newResults.slice(-TRANSCRIPT_WINDOW);
+          });
+          setTranscriptHistoryState(prev => {
+            const newHistory = [...prev, data];
+            const sliced = newHistory.slice(-TRANSCRIPT_WINDOW);
+            if (setTranscriptHistory) setTranscriptHistory(sliced);
+            return sliced;
           });
         }
 

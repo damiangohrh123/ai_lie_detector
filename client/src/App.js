@@ -9,8 +9,10 @@ import './App.css';
 export default function App() {
   const [faceEmotions, setFaceEmotions] = useState([]);
   const [voiceResults, setVoiceResults] = useState([]);
+  const [transcriptHistory, setTranscriptHistory] = useState([]);
+
   // Aggregate transcript
-  const transcript = voiceResults.slice(-3).map(r => r.text).join(' ');
+  const transcript = transcriptHistory.map(r => r.text).join(' ');
 
   // Get latest [truth, lie] for face modality
   let faceVec = undefined;
@@ -74,7 +76,7 @@ export default function App() {
       <div className="second-pane">
         <section className="section">
           <h2 className="section-label">Voice Analysis</h2>
-          <VoiceRecorder setVoiceResults={setVoiceResults} />
+          <VoiceRecorder setVoiceResults={setVoiceResults} setTranscriptHistory={setTranscriptHistory} />
         </section>
         <section className="section">
           <h2 className="section-label">Face Analysis</h2>
@@ -82,7 +84,7 @@ export default function App() {
         </section>
         <section className="section">
           <h2 className="section-label">Text Analysis</h2>
-          <TextAnalysis transcript={transcript} segments={voiceResults} />
+          <TextAnalysis transcript={transcript} segments={transcriptHistory} />
         </section>
       </div>
 
