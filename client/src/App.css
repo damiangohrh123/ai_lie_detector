@@ -118,3 +118,33 @@ code {
   border-top-left-radius: 5px;
   border-top-right-radius: 5px;
 }
+
+.transcript-box {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 2;
+}
+
+.transcript-ul {
+  list-style: 'none';
+  padding: 0
+}
+
+.transcript-li {
+  margin-Bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.transcript-text {
+  font-weight: bold;
+  margin-right: 20px;
+}
+
+.transcript-label {
+  color: white;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 0.95em;
+}
