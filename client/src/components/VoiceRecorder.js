@@ -14,11 +14,7 @@ const emotionFullNames = {
   ang: "Angry"
 };
 
-// Environment-based WebSocket URL
-const WS_URL = process.env.NODE_ENV === 'production' 
-  ? process.env.REACT_APP_WS_URL || "wss://render-app.onrender.com/ws/audio"
-  : "ws://localhost:8000/ws/audio";
-
+const WS_URL = "ws://localhost:8000/ws/audio";
 const TRANSCRIPT_WINDOW = 3;
 const RECONNECT_DELAY = 3000;
 const MOVING_AVG_WINDOW = 3;
