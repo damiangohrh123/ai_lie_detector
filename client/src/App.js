@@ -31,7 +31,7 @@ export default function App() {
         </section>
         <section className="section">
           <h2 className="section-label">Text Analysis</h2>
-          <TextAnalysis transcript={transcript} />
+          <TextAnalysis transcript={transcript} segments={voiceResults} />
         </section>
       </div>
 

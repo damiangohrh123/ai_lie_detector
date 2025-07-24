@@ -5,6 +5,7 @@ import os
 import torch
 import torchaudio
 import numpy as np
+import httpx    
 
 # Import Wav2Vec2 model
 from transformers import (
@@ -162,11 +163,22 @@ async def websocket_audio(websocket: WebSocket):
                 result = json.loads(recognizer.Result())
                 final_text = result.get("text", "")
 
-                # Text sentiment analysis (placeholder: just send the text)
-                await websocket.send_text(json.dumps({
-                    "type": "text_sentiment",
-                    "text": final_text
-                }))
+                # Text sentiment analysis: call the /api/text-sentiment endpoint
+                if final_text.strip():
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.post("http://localhost:8000/api/text-sentiment", json={"text": final_text})
+                        sentiment = resp.json()
+                    await websocket.send_text(json.dumps({
+                        "type": "text_sentiment",
+                        "text": final_text,
+                        "label": sentiment.get("label"),
+                        "score": sentiment.get("score")
+                    }))
+                else:
+                    await websocket.send_text(json.dumps({
+                        "type": "text_sentiment",
+                        "text": final_text
+                    }))
             else:
                 partial = json.loads(recognizer.PartialResult())
                 await websocket.send_text(json.dumps({
