@@ -19,6 +19,7 @@ import json
 import noisereduce as nr
 import webrtcvad
 import asyncio
+from scipy.signal import butter, lfilter
 
 router = APIRouter()
 
@@ -32,6 +33,18 @@ vosk_model = VoskModel("vosk-model-small-en-us-0.15")
 
 emotion_labels = ["ang", "hap", "neu", "sad"]
 
+def butter_bandpass(lowcut, highcut, fs, order=4):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def bandpass_filter(data, lowcut, highcut, fs, order=4):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
 def analyze_emotion(audio_tensor, sr):
     inputs = emotion_processor(audio_tensor.squeeze().numpy(), sampling_rate=sr, return_tensors="pt")
     with torch.no_grad():
@@ -41,7 +54,7 @@ def analyze_emotion(audio_tensor, sr):
     # Returns a dictionary. E.g. { "ang": 0.02, "hap": 0.87, "neu": 0.05, "sad": 0.06 }
     return {label: round(float(probs[i]), 4) for i, label in enumerate(emotion_labels)}
 
-def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=2):
+def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
     # Creates a VAD object
     vad = webrtcvad.Vad(aggressiveness)
 
@@ -117,8 +130,11 @@ async def root():
         }
     }
 
+last_transcript = ""
+
 @router.websocket("/ws/audio")
 async def websocket_audio(websocket: WebSocket):
+    global last_transcript
     await websocket.accept()
     sample_rate = 16000
     recognizer = KaldiRecognizer(vosk_model, sample_rate) # Creates a Vosk recognizer instance
@@ -133,7 +149,9 @@ async def websocket_audio(websocket: WebSocket):
                 # Get the most recent window_size bytes
                 window_bytes = audio_buffer[-window_size:]
                 audio_np = np.frombuffer(window_bytes, dtype=np.int16).astype(np.float32) / 32767.0
-                segment_tensor = torch.tensor(audio_np).unsqueeze(0)
+                # Apply band-pass filter for speech (300-3400 Hz)
+                filtered_audio = bandpass_filter(audio_np, 300, 3400, sample_rate)
+                segment_tensor = torch.tensor(filtered_audio).unsqueeze(0)
                 try:
                     # Run VAD to check for speech
                     speech_segments = vad(segment_tensor, sample_rate, aggressiveness=3)
@@ -142,6 +160,12 @@ async def websocket_audio(websocket: WebSocket):
                         await websocket.send_text(json.dumps({
                             "type": "voice_sentiment",
                             "emotion": emotion
+                        }))
+                    else:
+                        # No speech detected: send zeros
+                        await websocket.send_text(json.dumps({
+                            "type": "voice_sentiment",
+                            "emotion": {label: 0.0 for label in emotion_labels}
                         }))
                 except Exception as e:
                     print(f"Voice sentiment error: {e}")
@@ -163,8 +187,9 @@ async def websocket_audio(websocket: WebSocket):
                 result = json.loads(recognizer.Result())
                 final_text = result.get("text", "")
 
-                # Text sentiment analysis: call the /api/text-sentiment endpoint
                 if final_text.strip():
+                    last_transcript = final_text
+                    # Text sentiment analysis: call the /api/text-sentiment endpoint
                     async with httpx.AsyncClient() as client:
                         resp = await client.post("http://localhost:8000/api/text-sentiment", json={"text": final_text})
                         sentiment = resp.json()
@@ -177,7 +202,9 @@ async def websocket_audio(websocket: WebSocket):
                 else:
                     await websocket.send_text(json.dumps({
                         "type": "text_sentiment",
-                        "text": final_text
+                        "text": last_transcript,
+                        "label": "NEUTRAL",
+                        "score": 0.0
                     }))
             else:
                 partial = json.loads(recognizer.PartialResult())
