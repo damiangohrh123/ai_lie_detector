@@ -50,17 +50,15 @@ export default function FusionTruthfulness({ face, voice, text }) {
   }, [face, voice, text]);
 
   return (
-    <div className="fusion-truthfulness-container" style={{ margin: '20px 0', padding: 16, border: '1px solid #ccc', borderRadius: 8 }}>
-      <h3>Overall Truthfulness Score</h3>
+    <div className="fusion-container">
       {error && <div style={{ color: 'red' }}>{error}</div>}
       {result && (
         <div>
-          <div style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 8 }}>
+          <div className="deceptive-score">
             Deceptive Score: {(result.score * 100).toFixed(1)}%
           </div>
         </div>
       )}
-      {!result && <div style={{ color: '#aaa' }}>No data to fuse yet.</div>}
     </div>
   );
 }
