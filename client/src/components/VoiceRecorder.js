@@ -86,6 +86,11 @@ export default function VoiceRecorder({ setVoiceResults }) {
             const updated = [...prev, data.emotion];
             return updated.slice(-MOVING_AVG_WINDOW);
           });
+          // Also push to results for fusion
+          setResults(prev => {
+            const newResults = [...prev, { ...data, type: "voice_sentiment" }];
+            return newResults.slice(-TRANSCRIPT_WINDOW);
+          });
         }
       } catch (e) {
         console.warn("Failed to parse WebSocket message:", e);
