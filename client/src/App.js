@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import FaceExpressionDetector from './components/FaceExpressionDetector';
 import VoiceRecorder from './components/VoiceRecorder';
 import FaceAnalysisBars from './components/FaceAnalysisBars';
 import TextAnalysis from './components/TextAnalysis';
 import FusionTruthfulness from './components/FusionTruthfulness';
+import DeceptionTimeline from './components/DeceptionTimeline';
 import './App.css';
 
 export default function App() {
   const [faceEmotions, setFaceEmotions] = useState([]);
   const [voiceResults, setVoiceResults] = useState([]);
   const [transcriptHistory, setTranscriptHistory] = useState([]);
+  const [deceptionTimeline, setDeceptionTimeline] = useState([]);
+  const [fusionScore, setFusionScore] = useState(null);
 
-  // Aggregate transcript
+  // Use transcriptHistory for display
   const transcript = transcriptHistory.map(r => r.text).join(' ');
 
   // Get latest [truth, lie] for face modality
@@ -65,6 +68,18 @@ export default function App() {
     }
   }
 
+  // Track the latest fusion score for the timeline
+  const fusionScoreRef = useRef(null);
+  useEffect(() => {
+    // Listen for changes in the fusion score from FusionTruthfulness
+    if (fusionScore !== null && fusionScore !== undefined) {
+      setDeceptionTimeline(prev => {
+        const next = [...prev, { time: Date.now(), score: fusionScore }];
+        return next.slice(-60); // Keep last 60 points
+      });
+    }
+  }, [fusionScore]);
+
   return (
     <div className="app-layout">
       {/* Video and timeline analysis section */}
@@ -90,7 +105,8 @@ export default function App() {
 
       {/* Overall truthfulness section */}
       <div className="third-pane">
-        <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} />
+        <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
+        <DeceptionTimeline timeline={deceptionTimeline} />
       </div>
     </div>
   );
