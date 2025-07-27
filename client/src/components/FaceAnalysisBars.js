@@ -20,21 +20,23 @@ const emotionFullNames = {
 
 export default function FaceAnalysisBars({ smoothedEmotions }) {
   return (
-    <div className="face-emotion-bar-graph">
+    <div className="face-analysis-container">
       {['neutral', 'happy', 'sad', 'angry', 'disgusted', 'fearful'].map((emotion) => {
         const match = smoothedEmotions.find((e) => e.emotion === emotion);
         const probability = match ? match.probability : 0;
         return (
-          <div className="face-bar-container" key={emotion}>
-            <div className="face-bar"
-              style={{
-                height: `${probability * 1.5}px`,
-                backgroundColor: emotionColors[emotion] || '#007bff',
-              }}
-            />
-            <div className="face-bar-label">
-              {emotionFullNames[emotion]}<br />{probability}%
+          <div key={emotion} className="face-analysis-bars">
+            <span className="face-analysis-bars-label">{emotionFullNames[emotion]}</span>
+            <div className="face-analysis-bar-background">
+              <div style={{
+                width: `${probability}%`,
+                height: '100%',
+                background: emotionColors[emotion] || '#007bff',
+                borderRadius: 4,
+                transition: 'width 0.4s'
+              }} />
             </div>
+            <span style={{ width: 50, textAlign: 'right', fontSize: '0.95em', color: '#666', fontWeight: '500' }}>{probability.toFixed(1)}%</span>
           </div>
         );
       })}

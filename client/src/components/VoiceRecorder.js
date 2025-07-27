@@ -15,7 +15,6 @@ const emotionFullNames = {
 };
 
 const WS_URL = "ws://localhost:8000/ws/audio";
-const TRANSCRIPT_WINDOW = 3;
 const RECONNECT_DELAY = 3000;
 const MOVING_AVG_WINDOW = 3;
 
@@ -71,15 +70,11 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
 
         // Only process final text segments for transcript
         if (data.type === "text_sentiment" && data.text && data.text.trim()) {
-          setResults(prev => {
-            const newResults = [...prev, data];
-            return newResults.slice(-TRANSCRIPT_WINDOW);
-          });
+          setResults(prev => [...prev, data]);
           setTranscriptHistoryState(prev => {
             const newHistory = [...prev, data];
-            const sliced = newHistory.slice(-TRANSCRIPT_WINDOW);
-            if (setTranscriptHistory) setTranscriptHistory(sliced);
-            return sliced;
+            if (setTranscriptHistory) setTranscriptHistory(newHistory);
+            return newHistory;
           });
         }
 
@@ -90,10 +85,7 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
             return updated.slice(-MOVING_AVG_WINDOW);
           });
           // Also push to results for fusion
-          setResults(prev => {
-            const newResults = [...prev, { ...data, type: "voice_sentiment" }];
-            return newResults.slice(-TRANSCRIPT_WINDOW);
-          });
+          setResults(prev => [...prev, { ...data, type: "voice_sentiment" }]);
         }
       } catch (e) {
         console.warn("Failed to parse WebSocket message:", e);
@@ -190,22 +182,22 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
 
   return (
     <div className="voice-container">
-      <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
-        {getConnectionStatusDisplay()}
-      </div>
-      <div className="voice-emotion-bar-graph">
+      <div className="voice-connection-status"> {getConnectionStatusDisplay()} </div>
+      <div className="voice-analysis-container">
         {['neu', 'hap', 'sad', 'ang'].map((emotion) => (
-          <div className="voice-bar-container" key={emotion}>
-            <div className="voice-bar"
-              style={{
-                height: `${getAvgEmotion(emotion) * 1.5}px`,
-                backgroundColor: emotionColors[emotion] || '#007bff',
+          <div key={emotion} className="voice-analysis-bars">
+            <span className="voice-analysis-bars-label"> {emotionFullNames[emotion] }</span>
+            <div className="voice-analysis-bar-background">
+              <div style={{
+                width: `${getAvgEmotion(emotion)}%`,
+                height: '100%',
+                background: emotionColors[emotion] || '#007bff',
+                borderRadius: 4,
+                transition: 'width 0.4s',
                 opacity: connectionStatus === 'connected' ? 1 : 0.5
-              }}
-            />
-            <div className="bar-label">
-              {emotionFullNames[emotion]}<br />{getAvgEmotion(emotion).toFixed(1)}%
+              }} />
             </div>
+            <span style={{ width: 50, textAlign: 'right', fontSize: '0.95em', color: '#666', fontWeight: '500' }}>{getAvgEmotion(emotion).toFixed(1)}%</span>
           </div>
         ))}
       </div>

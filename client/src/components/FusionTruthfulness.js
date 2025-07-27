@@ -1,8 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
 
-// Helper to check if a modality is present and valid
 const isValid = arr => Array.isArray(arr) && arr.length === 2 && arr.every(x => typeof x === 'number');
+
+function getConfidenceLabel(score) {
+  if (score < 0.2) return 'High Confidence - Truthful';
+  if (score < 0.5) return 'Likely Truthful';
+  if (score < 0.8) return 'Likely Deceptive';
+  return 'High Confidence - Deceptive';
+}
 
 export default function FusionTruthfulness({ face, voice, text, setFusionScore }) {
   const [result, setResult] = useState(null);
@@ -11,14 +17,12 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
   const timeoutRef = useRef(null);
 
   useEffect(() => {
-    // Clear any pending timeout on unmount
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
   useEffect(() => {
-    // Only send request at most once per second
     if (!isValid(face) && !isValid(voice) && !isValid(text)) {
       setResult(null);
       if (setFusionScore) setFusionScore(null);
@@ -56,13 +60,36 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
     }
   }, [face, voice, text, setFusionScore]);
 
+  // Calculate truth score
+  const truthScore = result ? 1 - result.score : null;
+  const percent = truthScore !== null ? (truthScore * 100).toFixed(1) : null;
+  const confidenceLabel = truthScore !== null ? getConfidenceLabel(result.score) : '';
+  const barColor = truthScore > 0.5 ? '#22c55e' : (truthScore > 0.2 ? '#e69c14ff' : '#ef4444');
+
   return (
-    <div className="fusion-container">
+    <div className="truth-score-container">
       {error && <div style={{ color: 'red' }}>{error}</div>}
       {result && (
-        <div style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 8 }}>
-          Deceptive Score: {(result.score * 100).toFixed(1)}%
-        </div>
+        <>
+          <div className="truth-score-title-container">
+            <span className="tick-emoji">✔</span>
+            <span className="truth-score-title">Truth Score</span>
+          </div>
+          <div style={{ fontSize: 56, fontWeight: 700, color: barColor, marginBottom: 8 }}>{percent}%</div>
+          <div style={{ fontSize: 18, color: barColor, marginBottom: 24 }}>{confidenceLabel}</div>
+          <div style={{ width: '100%', height: 12, background: '#e5e7eb', borderRadius: 6, margin: '24px 0', position: 'relative' }}>
+            <div style={{
+              width: `${truthScore * 100}%`,
+              height: '100%',
+              background: barColor,
+              borderRadius: 6,
+              transition: 'width 0.5s'
+            }} />
+          </div>
+          <div style={{ fontSize: 14, color: '#666', marginTop: 8 }}>
+            0% = Highly Deceptive | 100% = Completely Truthful
+          </div>
+        </>
       )}
     </div>
   );

@@ -23,14 +23,14 @@ export default function App() {
     const last = faceEmotions;
 
     // Truthful emotions: neutral, happy
-    const truth = (last.find(e => e.emotion === 'neutral')?.probability || 0) 
-                + (last.find(e => e.emotion === 'happy')?.probability || 0);
+    const truth = (last.find(e => e.emotion === 'neutral')?.probability || 0)
+      + (last.find(e => e.emotion === 'happy')?.probability || 0);
 
     // Deceptive emotions: angry, sad, disgusted, fearful
-    const lie = (last.find(e => e.emotion === 'angry')?.probability || 0) 
-              + (last.find(e => e.emotion === 'sad')?.probability || 0) 
-              + (last.find(e => e.emotion === 'disgusted')?.probability || 0) 
-              + (last.find(e => e.emotion === 'fearful')?.probability || 0);
+    const lie = (last.find(e => e.emotion === 'angry')?.probability || 0)
+      + (last.find(e => e.emotion === 'sad')?.probability || 0)
+      + (last.find(e => e.emotion === 'disgusted')?.probability || 0)
+      + (last.find(e => e.emotion === 'fearful')?.probability || 0);
 
     // Normalize to [0, 1]
     faceVec = [truth / 100, lie / 100];
@@ -85,28 +85,25 @@ export default function App() {
       {/* Video and timeline analysis section */}
       <div className="first-pane">
         <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
+        <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
       </div>
 
       {/* Voice, face, and text analysis section */}
       <div className="second-pane">
-        <section className="section">
+        <section className="voice-section">
           <h2 className="section-label">Voice Analysis</h2>
           <VoiceRecorder setVoiceResults={setVoiceResults} setTranscriptHistory={setTranscriptHistory} />
         </section>
-        <section className="section">
+        <section className="face-section">
           <h2 className="section-label">Face Analysis</h2>
           <FaceAnalysisBars smoothedEmotions={faceEmotions} />
         </section>
-        <section className="section">
-          <h2 className="section-label">Text Analysis</h2>
-          <TextAnalysis transcript={transcript} segments={transcriptHistory} />
-        </section>
+        <DeceptionTimeline timeline={deceptionTimeline} />
       </div>
 
       {/* Overall truthfulness section */}
       <div className="third-pane">
-        <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
-        <DeceptionTimeline timeline={deceptionTimeline} />
+        <TextAnalysis transcript={transcript} segments={transcriptHistory} />
       </div>
     </div>
   );
