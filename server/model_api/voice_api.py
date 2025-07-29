@@ -199,13 +199,6 @@ async def websocket_audio(websocket: WebSocket):
                         "label": sentiment.get("label"),
                         "score": sentiment.get("score")
                     }))
-                else:
-                    await websocket.send_text(json.dumps({
-                        "type": "text_sentiment",
-                        "text": last_transcript,
-                        "label": "NEUTRAL",
-                        "score": 0.0
-                    }))
             else:
                 partial = json.loads(recognizer.PartialResult())
                 await websocket.send_text(json.dumps({
