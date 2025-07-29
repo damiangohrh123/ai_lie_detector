@@ -29,7 +29,7 @@ emotion_processor = Wav2Vec2FeatureExtractor.from_pretrained("superb/wav2vec2-ba
 emotion_model.eval()
 
 # Load Vosk model once on startup
-vosk_model = VoskModel("vosk-model-small-en-us-0.15")
+vosk_model = VoskModel("models/vosk-model-small-en-us-0.15")
 
 emotion_labels = ["ang", "hap", "neu", "sad"]
 
