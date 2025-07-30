@@ -5,9 +5,11 @@ import FaceAnalysisBars from './components/FaceAnalysisBars';
 import TextAnalysis from './components/TextAnalysis';
 import FusionTruthfulness from './components/FusionTruthfulness';
 import DeceptionTimeline from './components/DeceptionTimeline';
+import FileUploader from './components/FileUploader';
 import './App.css';
 
 export default function App() {
+  const [mode, setMode] = useState('webcam'); // 'webcam' or 'upload'
   const [faceEmotions, setFaceEmotions] = useState([]);
   const [voiceResults, setVoiceResults] = useState([]);
   const [transcriptHistory, setTranscriptHistory] = useState([]);
@@ -82,22 +84,72 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Video and timeline analysis section */}
       <div className="first-pane">
-        <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
-        <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
+        {/* Mode Selector */}
+        <div className="mode-selector-container">
+          <button
+            onClick={() => setMode('webcam')}
+            className="mode-button"
+            style={{
+              background: mode === 'webcam' ? 'white' : 'transparent',
+              color: mode === 'webcam' ? '#374151' : '#6b7280',
+              fontWeight: mode === 'webcam' ? 600 : 500,
+              boxShadow: mode === 'webcam' ? '0 1px 3px 0 rgba(0, 0, 0, 0.1)' : 'none'
+            }}
+          >
+            📹 Webcam Mode
+          </button>
+          <button
+            onClick={() => setMode('upload')}
+            className="mode-button"
+            style={{
+              background: mode === 'upload' ? 'white' : 'transparent',
+              color: mode === 'upload' ? '#374151' : '#6b7280',
+              fontWeight: mode === 'upload' ? 600 : 500,
+              boxShadow: mode === 'upload' ? '0 1px 3px 0 rgba(0, 0, 0, 0.1)' : 'none'
+            }}
+          >
+            📁 File Upload Mode
+          </button>
+
+        </div>
+
+        {/* Video and timeline analysis section */}
+        {mode === 'webcam' ? (
+          <>
+            <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
+            <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
+          </>
+        ) : (
+          <FileUploader
+            setVoiceResults={setVoiceResults}
+            setTranscriptHistory={setTranscriptHistory}
+            setFaceEmotions={setFaceEmotions}
+          />
+        )}
       </div>
 
       {/* Voice, face, and text analysis section */}
       <div className="second-pane">
-        <section className="voice-section">
-          <h2 className="section-label">Voice Analysis</h2>
-          <VoiceRecorder setVoiceResults={setVoiceResults} setTranscriptHistory={setTranscriptHistory} />
-        </section>
-        <section className="face-section">
-          <h2 className="section-label">Face Analysis</h2>
-          <FaceAnalysisBars smoothedEmotions={faceEmotions} />
-        </section>
+        {mode === 'webcam' ? (
+          <>
+            <section className="voice-section">
+              <h2 className="section-label">Voice Analysis</h2>
+              <VoiceRecorder setVoiceResults={setVoiceResults} setTranscriptHistory={setTranscriptHistory} />
+            </section>
+            <section className="face-section">
+              <h2 className="section-label">Face Analysis</h2>
+              <FaceAnalysisBars smoothedEmotions={faceEmotions} />
+            </section>
+          </>
+        ) : (
+          <section className="upload-section">
+            <h2 className="section-label">Upload Analysis</h2>
+            <div style={{ color: '#6b7280', fontSize: 14, textAlign: 'center', padding: '20px' }}>
+              Upload a video file above to start analysis. Results will appear here once processing is complete.
+            </div>
+          </section>
+        )}
         <DeceptionTimeline timeline={deceptionTimeline} />
       </div>
 

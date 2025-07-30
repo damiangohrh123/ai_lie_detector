@@ -73,7 +73,6 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
           setResults(prev => [...prev, data]);
           setTranscriptHistoryState(prev => {
             const newHistory = [...prev, data];
-            if (setTranscriptHistory) setTranscriptHistory(newHistory);
             return newHistory;
           });
         }
@@ -157,6 +156,11 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
   useEffect(() => {
     if (setVoiceResults) setVoiceResults(results);
   }, [results, setVoiceResults]);
+
+  // Notify parent of transcript history changes
+  useEffect(() => {
+    if (setTranscriptHistory) setTranscriptHistory(transcriptHistory);
+  }, [transcriptHistory, setTranscriptHistory]);
 
   const getConnectionStatusDisplay = () => {
     switch (connectionStatus) {

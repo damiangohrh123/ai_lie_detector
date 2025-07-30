@@ -44,53 +44,74 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
     let emotionHistory = [];
 
     const intervalId = setInterval(async () => {
-      // Make sure video is playing
-      if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
+      // Make sure video is playing and both video and canvas refs exist
+      if (!videoRef.current || !canvasRef.current || videoRef.current.paused || videoRef.current.ended) {
+        return;
+      }
 
-      // Always clear the canvas before drawing
-      const ctx = canvasRef.current.getContext('2d');
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      // Additional safety check for video dimensions
+      if (!videoRef.current.videoWidth || !videoRef.current.videoHeight) {
+        return;
+      }
 
-      // Detect facial expression
-      const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
+      try {
+        // Always clear the canvas before drawing
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-      if (result) {
-        // Draw the bounding box on the detected face
-        const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
-        const resized = faceapi.resizeResults(result, dims);
-        faceapi.draw.drawDetections(canvasRef.current, resized);
+        // Detect facial expression
+        const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
 
-        // Get the expressions (combine surprised and fearful)
-        const { expressions = {} } = resized;
-        const grouped = {
-          neutral: expressions.neutral || 0,
-          happy: expressions.happy || 0,
-          sad: expressions.sad || 0,
-          angry: expressions.angry || 0,
-          disgusted: expressions.disgusted || 0,
-          fearful: (expressions.fearful || 0) + (expressions.surprised || 0),
-        };
+        if (result) {
+          // Draw the bounding box on the detected face
+          const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
+          const resized = faceapi.resizeResults(result, dims);
+          faceapi.draw.drawDetections(canvasRef.current, resized);
 
-        // Rolling average over last 5 frames
-        emotionHistory = [...emotionHistory, grouped].slice(-5);
-        const averaged = {};
-        for (const key of Object.keys(grouped)) {
-          const total = emotionHistory.reduce((sum, e) => sum + (e[key] || 0), 0);
-          averaged[key] = total / emotionHistory.length;
+          // Get the expressions (combine surprised and fearful)
+          const { expressions = {} } = resized;
+          const grouped = {
+            neutral: expressions.neutral || 0,
+            happy: expressions.happy || 0,
+            sad: expressions.sad || 0,
+            angry: expressions.angry || 0,
+            disgusted: expressions.disgusted || 0,
+            fearful: (expressions.fearful || 0) + (expressions.surprised || 0),
+          };
+
+          // Rolling average over last 5 frames
+          emotionHistory = [...emotionHistory, grouped].slice(-5);
+          const averaged = {};
+          for (const key of Object.keys(grouped)) {
+            const total = emotionHistory.reduce((sum, e) => sum + (e[key] || 0), 0);
+            averaged[key] = total / emotionHistory.length;
+          }
+
+          const allEmotions = Object.entries(averaged).map(([emotion, prob]) => ({
+            emotion,
+            probability: parseFloat((prob * 100).toFixed(1)),
+          }));
+          setSmoothedEmotions(allEmotions);
+        } else {
+          setSmoothedEmotions([]);
+          emotionHistory = [];
         }
-
-        const allEmotions = Object.entries(averaged).map(([emotion, prob]) => ({
-          emotion,
-          probability: parseFloat((prob * 100).toFixed(1)),
-        }));
-        setSmoothedEmotions(allEmotions);
-      } else {
+      } catch (error) {
+        // Handle any errors that might occur during face detection
+        console.warn('Face detection error:', error);
         setSmoothedEmotions([]);
         emotionHistory = [];
       }
     }, 300);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      // Clean up video stream when component unmounts
+      if (videoRef.current && videoRef.current.srcObject) {
+        const tracks = videoRef.current.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+    };
   }, [loading]);
 
   // Send emotions to parent
@@ -115,7 +136,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
           width="1280"
           height="720"
           className="overlay-canvas"
-          style={{ width: '640px', height: '360px', position: 'absolute', top: 0, left: 0 }}
+          style={{ width: '640px', height: '360px', position: 'absolute', top: 100, left: 20 }}
         />
       </div>
     </div>
