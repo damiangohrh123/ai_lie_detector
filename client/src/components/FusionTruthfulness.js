@@ -67,17 +67,13 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
   const barColor = truthScore > 0.5 ? '#22c55e' : (truthScore > 0.2 ? '#e69c14ff' : '#ef4444');
 
   return (
-    <div className="truth-score-container">
+    <div>
       {error && <div style={{ color: 'red' }}>{error}</div>}
       {result && (
         <>
-          <div className="truth-score-title-container">
-            <span className="tick-emoji">✔</span>
-            <span className="truth-score-title">Truth Score</span>
-          </div>
           <div style={{ fontSize: 56, fontWeight: 700, color: barColor, marginBottom: 8 }}>{percent}%</div>
           <div style={{ fontSize: 18, color: barColor, marginBottom: 24 }}>{confidenceLabel}</div>
-          <div style={{ width: '100%', height: 12, background: '#e5e7eb', borderRadius: 6, margin: '24px 0', position: 'relative' }}>
+          <div className="truth-score-bar-background">
             <div style={{
               width: `${truthScore * 100}%`,
               height: '100%',

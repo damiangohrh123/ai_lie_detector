@@ -1,9 +1,13 @@
 :root {
   --heading-text-color: #1e293b;
   --text-color: #474747;
-  --sub-text-color: #666666;
+  --sub-text-color:   #888888;
   --background-color: #f4f7fa;
+  --sub-background-color: #f9fafb;
+  --bar-background-color: #e5e7eb;
   --outline-color: #e5e7eb;
+  --truth-green: #22c55e;
+  --deceptive-red: #ef4444;
 }
 
 html, body, #root {
@@ -50,6 +54,7 @@ code {
   flex: 1;
   height: 100vh;
   display: flex;
+  min-width: 664px;
   flex-direction: column;
   gap: 20px;
   padding: 20px 0 0 20px;
@@ -79,15 +84,30 @@ code {
   border: var(--outline-color) 2px solid;
 }
 
+
+
+
 .video-wrapper {
-  aspect-ratio: 16/9;
+  width: 100%;
+  height: 360px;
   border-radius: 8px;
   border: var(--outline-color) 2px solid;
   overflow: hidden;
 }
 
+.fusion-section {
+  display: flex;
+  min-height: 300px;
+  flex-direction: column;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: var(--outline-color) 2px solid;
+}
+
 .voice-section {
   display: flex;
+  min-height: 300px;
   flex-direction: column;
   background-color: white;
   padding: 20px;
@@ -97,9 +117,20 @@ code {
 
 .face-section {
   display: flex;
+  min-height: 305px;
   flex-direction: column;
   background-color: white;
   padding: 20px;
+  border-radius: 8px;
+  border: var(--outline-color) 2px solid;
+}
+
+.deception-timeline-section {
+  display: flex;
+  min-height: 247px;
+  flex-direction: column;
+  background-color: white;
+  padding: 20px 20px 0 20px;
   border-radius: 8px;
   border: var(--outline-color) 2px solid;
 }
@@ -112,32 +143,29 @@ code {
   margin: 0 0 20px 0;
 }
 
-.face-analysis-container {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex: 2;
+
+
+.truth-score-bar-background {
+  width: 100%;
+  height: 12px;
+  background: var(--bar-background-color);
+  border-radius: 6px;
+  position: relative;
+  margin: 24px 0;
+  position: relative;
 }
 
-.face-analysis-bars {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
+
+
+
+.deceptive-score {
+  font-size: 22;
+  font-weight: bold;
 }
 
-.face-analysis-bars-label {
-  color: var(--text-color);
-  font-weight: 500;
-  width: 70px;
-}
 
-.face-analysis-bar-background {
-  flex: 1;
-  height: 8px;
-  background-color: #f0f0f0;
-  border-radius: 4px;
-  margin: 0 20px 0 10px;
-}
+
+
 
 .voice-container {
   display: flex;
@@ -148,7 +176,7 @@ code {
 
 .voice-connection-status {
   font-size: 14px;
-  color: #666;
+  color: var(--sub-text-color);
   margin-top: 5px;
 }
 
@@ -173,75 +201,120 @@ code {
 .voice-analysis-bar-background {
   flex: 1;
   height: 8px;
-  background-color: #f0f0f0;
+  background-color: var(--bar-background-color);
   border-radius: 4px;
   margin: 0 20px 0 10px;
 }
 
-.transcript-box {
+
+
+
+.face-analysis-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 5px;
   flex: 2;
 }
 
-.transcript-ul {
-  list-style: 'none';
-  padding: 0
-}
-
-.transcript-li {
-  margin-Bottom: 10px;
+.face-analysis-bars {
   display: flex;
   align-items: center;
+  margin-bottom: 10px;
 }
 
-.transcript-text {
-  font-weight: bold;
-  margin-right: 20px;
+.face-analysis-bars-label {
+  color: var(--text-color);
+  font-weight: 500;
+  width: 70px;
 }
 
-.transcript-label {
-  color: white;
-  border-radius: 12px;
-  padding: 2px 10px;
-  font-size: 0.95em;
+.face-analysis-bar-background {
+  flex: 1;
+  height: 8px;
+  background-color: var(--bar-background-color);
+  border-radius: 4px;
+  margin: 0 20px 0 10px;
 }
 
-.truth-score-container {
-  background-color: white;
-  padding: 20px;
+
+
+
+.deception-timeline-container {
+  width: 100%;
+  height: 100%;
+}
+
+
+
+
+.no-transcript-placeholder {
+  color: var(--sub-text-color);
+}
+
+.transcript-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.transcript-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: var(--sub-background-color);
   border-radius: 8px;
-  text-align: center;
-  border: var(--outline-color) 2px solid;
+  padding: 18px 24px;
+  gap: 20px;
 }
 
-.truth-score-title-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+.transcript {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-color);
   margin-bottom: 8px;
 }
 
-.tick-emoji {
-  color: #22c55e;
-  font-size: 22px;
+.transcript-confidence-container {
+  display: flex;
+  gap: 18px;
+  align-items: center;
 }
 
-.truth-score-title {
+.transcript-confidence-truthful {
+  color: var(--truth-green);
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.transcript-confidence-deceptive {
+  color: var(--deceptive-red);
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.transcript-sentiment-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  background-color: var(--deceptive-red);
+}
+
+.transcript-sentiment {
+  position: absolute;
+  top: 16px;
+  right: 16px;
   font-weight: 600;
-  font-size: 22px;
-  color: var(--heading-text-color);
+  font-size: 15px;
+  border-radius: 8px;
+  padding: 4px 16px;
 }
 
-.deceptive-score {
-  font-size: 22;
-  font-weight: bold;
-}
+
+
 
 .mode-selector-container {
-  background: rgb(255, 255, 255);
+  background: white;
   width: 53%;
   border-radius: 8px;
   height: 60px;
@@ -256,7 +329,53 @@ code {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
+  color: #6b7280;
+  background: transparent;
+  font-weight: 500;
 }
 
+.mode-button.active {
+  background: rgb(148, 148, 148);
+  color: #ffffff;
+  font-weight: 600;
+}
 
-/* File Upload Styles */
+.upload-new-file-button {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  margin-left: 8px;
+}
+
+.upload-analysis-placeholder-text {
+  font-size: 14px;
+  color: var(--sub-text-color);
+  text-align: center;
+  padding: 80px 20px;
+}
+
+.file-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 2px dashed #d1d5db;
+  min-height: 360px;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-upload-text-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}

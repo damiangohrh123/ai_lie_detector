@@ -136,7 +136,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
           width="1280"
           height="720"
           className="overlay-canvas"
-          style={{ width: '640px', height: '360px', position: 'absolute', top: 100, left: 20 }}
+          style={{ width: '640px', height: '360px', position: 'absolute', top: 0, left: 0 }}
         />
       </div>
     </div>
