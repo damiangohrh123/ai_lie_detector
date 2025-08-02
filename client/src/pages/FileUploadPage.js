@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import FaceExpressionDetector from '../components/FaceExpressionDetector';
-import VoiceRecorder from '../components/VoiceRecorder';
+import AudioProcessor from '../components/AudioProcessor';
 import FaceAnalysisBars from '../components/FaceAnalysisBars';
 import TextAnalysis from '../components/TextAnalysis';
 import FusionTruthfulness from '../components/FusionTruthfulness';
@@ -15,6 +15,7 @@ export default function FileUploadPage() {
   const [transcriptHistory, setTranscriptHistory] = useState([]);
   const [deceptionTimeline, setDeceptionTimeline] = useState([]);
   const [fusionScore, setFusionScore] = useState(null);
+  const [videoRef, setVideoRef] = useState(null);
 
   // Use transcriptHistory for display
   const transcript = transcriptHistory.map(r => r.text).join(' ');
@@ -136,7 +137,11 @@ export default function FileUploadPage() {
         {/* Video area - only show when file is uploaded */}
         {uploadedFile && (
           <div style={{ position: 'relative' }}>
-            <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
+            <FaceExpressionDetector 
+              onEmotionsUpdate={setFaceEmotions} 
+              videoFile={uploadedFile}
+              onVideoRef={setVideoRef}
+            />
           </div>
         )}
 
@@ -162,7 +167,13 @@ export default function FileUploadPage() {
           <>
             <section className="voice-section">
               <h2 className="section-label">👄 Voice Analysis</h2>
-              <VoiceRecorder setVoiceResults={setVoiceResults} setTranscriptHistory={setTranscriptHistory} />
+              <AudioProcessor 
+                mode="video"
+                videoFile={uploadedFile}
+                videoRef={videoRef}
+                setVoiceResults={setVoiceResults} 
+                setTranscriptHistory={setTranscriptHistory}
+              />
             </section>
             <section className="face-section">
               <h2 className="section-label">😀 Face Analysis</h2>

@@ -3,7 +3,7 @@ import * as faceapi from 'face-api.js';
 
 const MODEL_URL = '/models';
 
-export default function FaceExpressionDetector({ onEmotionsUpdate }) {
+export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = null, onVideoRef = null }) {
   const videoRef = useRef();
   const canvasRef = useRef();
   const [loading, setLoading] = useState(true);
@@ -14,9 +14,59 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
       setLoading(false);
-      startVideo();
+      
+      if (videoFile) {
+        // Use uploaded video file
+        startVideoFile();
+      } else {
+        // Use webcam
+        startWebcam();
+      }
     }
-    function startVideo() {
+
+    function startVideoFile() {
+      if (videoRef.current && videoFile) {
+        const videoUrl = URL.createObjectURL(videoFile);
+        videoRef.current.src = videoUrl;
+        videoRef.current.load();
+        
+        // Wait for video to be loaded before attempting to play
+        const playVideo = () => {
+          videoRef.current.play().then(() => {
+            // Video started successfully
+          }).catch(err => {
+            console.error('Error playing video:', err);
+            // Try again after a short delay
+            setTimeout(() => {
+              videoRef.current.play().catch(e => {
+                console.error('Second attempt to play video failed:', e);
+              });
+            }, 1000);
+          });
+        };
+
+        // Try to play when metadata is loaded
+        videoRef.current.addEventListener('loadedmetadata', () => {
+          playVideo();
+        });
+        
+        // Also try to play when canplay event fires
+        videoRef.current.addEventListener('canplay', () => {
+          if (videoRef.current.paused) {
+            playVideo();
+          }
+        });
+
+        // Try to play when loadeddata event fires
+        videoRef.current.addEventListener('loadeddata', () => {
+          if (videoRef.current.paused) {
+            playVideo();
+          }
+        });
+      }
+    }
+
+    function startWebcam() {
       navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
@@ -29,8 +79,9 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
         })
         .catch(err => console.error('Error accessing webcam:', err));
     }
+
     loadModels();
-  }, []);
+  }, [videoFile]);
 
   useEffect(() => {
     if (loading) return;
@@ -111,20 +162,31 @@ export default function FaceExpressionDetector({ onEmotionsUpdate }) {
         const tracks = videoRef.current.srcObject.getTracks();
         tracks.forEach(track => track.stop());
       }
+      // Clean up video file URL
+      if (videoRef.current && videoRef.current.src && videoRef.current.src.startsWith('blob:')) {
+        URL.revokeObjectURL(videoRef.current.src);
+      }
     };
-  }, [loading]);
+  }, [loading, videoFile]);
 
   // Send emotions to parent
   useEffect(() => {
     if (onEmotionsUpdate) onEmotionsUpdate(smoothedEmotions);
   }, [smoothedEmotions, onEmotionsUpdate]);
 
+  // Send video ref to parent for audio processing
+  useEffect(() => {
+    if (onVideoRef && videoRef.current) {
+      onVideoRef(videoRef.current);
+    }
+  }, [onVideoRef]);
+
   return (
     <div className="app-container" style={{ display: 'flex' }}>
       <div className="video-wrapper">
         <video
           ref={videoRef}
-          autoPlay
+          autoPlay={true} // Auto-play for both webcam and video files
           muted
           playsInline
           width="1280"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import FaceExpressionDetector from '../components/FaceExpressionDetector';
-import VoiceRecorder from '../components/VoiceRecorder';
+import AudioProcessor from '../components/AudioProcessor';
 import FaceAnalysisBars from '../components/FaceAnalysisBars';
 import TextAnalysis from '../components/TextAnalysis';
 import FusionTruthfulness from '../components/FusionTruthfulness';
@@ -97,7 +97,11 @@ export default function WebcamPage() {
       <div className="second-pane">
         <section className="voice-section">
           <h2 className="section-label">👄 Voice Analysis</h2>
-          <VoiceRecorder setVoiceResults={setVoiceResults} setTranscriptHistory={setTranscriptHistory} />
+          <AudioProcessor 
+            mode="live"
+            setVoiceResults={setVoiceResults} 
+            setTranscriptHistory={setTranscriptHistory} 
+          />
         </section>
         <section className="face-section">
           <h2 className="section-label">😀 Face Analysis</h2>

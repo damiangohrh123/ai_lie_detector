@@ -15,16 +15,25 @@ const emotionFullNames = {
 };
 
 const WS_URL = "ws://localhost:8000/ws/audio";
-const RECONNECT_DELAY = 3000;
 const MOVING_AVG_WINDOW = 3;
+const RECONNECT_DELAY = 3000;
 
-export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory }) {
+export default function AudioProcessor({ 
+  mode = 'video', // 'live' or 'video'
+  videoFile = null, 
+  videoRef = null, 
+  setVoiceResults, 
+  setTranscriptHistory 
+}) {
   const [results, setResults] = useState([]);
   const [transcriptHistory, setTranscriptHistoryState] = useState([]);
-  const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'connecting', 'connected', 'disconnected', 'error'
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isProcessing, setIsProcessing] = useState(false);
   const [voiceEmotionHistory, setVoiceEmotionHistory] = useState([]);
   const wsRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const sourceNodeRef = useRef(null);
+  const workletNodeRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
 
@@ -40,17 +49,21 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
 
     // When connection opens, set status to 'connected', and reset reconnect attempts.
     wsRef.current.onopen = () => {
-      console.log("WebSocket connected to backend");
       setConnectionStatus('connected');
       reconnectAttemptsRef.current = 0;
     };
-    wsRef.current.onerror = () => setConnectionStatus('error');
+
+    // Handle connection errors and set status to 'error'.
+    wsRef.current.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      setConnectionStatus('error');
+    };
+    
     // Handle connection close and set status to 'disconnected'.
     wsRef.current.onclose = () => {
-      console.log("WebSocket closed");
       setConnectionStatus('disconnected');
       
-      // Auto-reconnect with increasing delays after each attempt.
+      // Auto-reconnect with increasing delays after each attempt
       if (reconnectAttemptsRef.current < 5) {
         const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
@@ -64,9 +77,6 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
     wsRef.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type !== "partial") {
-          console.log("Received from backend:", data);
-        }
 
         // Only process final text segments for transcript
         if (data.type === "text_sentiment" && data.text && data.text.trim()) {
@@ -92,65 +102,132 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
     };
   };
 
-  useEffect(() => {
-    let audioContext, input, stream, workletNode;
-    let isCancelled = false;
-    
-    const startStreaming = async () => {
+  // Get audio source based on mode
+  const getAudioSource = async () => {
+    // If mode is live (webcam), get user media directly
+    if (mode === 'live') {
+      return await navigator.mediaDevices.getUserMedia({ audio: true });
+    } else {
+      // Video mode - try captureStream first, then MediaElementSource
+      if (!videoRef) throw new Error("Video reference required for video mode");
+      
       try {
-        // Connect WebSocket first.
-        connectWebSocket();
+        const stream = videoRef.captureStream();
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          throw new Error("No audio tracks in captureStream");
+        }
+        return stream;
+      } catch (error) {
+        // Fallback to MediaElementSource for uploaded files
+        return null; // Will be handled in processAudio
+      }
+    }
+  };
 
-        // Access microphone.
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  // Process audio from any source
+  const processAudio = async () => {
+    try {
+      // Connect WebSocket first
+      connectWebSocket();
+
+      // Create audio context
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      
+      if (mode === 'video') {
+        // Ensure video is playing for audio capture
+        if (videoRef && videoRef.paused) {
+          try {
+            await videoRef.play();
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } catch (playError) {
+            console.error("Failed to start video playback:", playError);
+          }
+        }
+      }
+      
+      // Get audio source
+      const stream = await getAudioSource();
+      
+      if (stream) {
+        // Use MediaStreamSource for live audio or captureStream
+        sourceNodeRef.current = audioContextRef.current.createMediaStreamSource(stream);
+      } else {
+        // Use MediaElementSource for uploaded video files
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(videoRef);
+      }
+
+      // Load the audio worklet processor for PCM conversion
+      await audioContextRef.current.audioWorklet.addModule('/pcm-processor.js');
+      workletNodeRef.current = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
+
+      // Connect the audio source through the worklet node
+      sourceNodeRef.current.connect(workletNodeRef.current);
+      
+      // Connect to destination to avoid audio context suspension
+      workletNodeRef.current.connect(audioContextRef.current.destination);
+
+      // Process audio data from the worklet
+      workletNodeRef.current.port.onmessage = (event) => {
+        const inputData = event.data;
         
-        // Create audio context for processing audio.
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        input = audioContext.createMediaStreamSource(stream);
-
-        // Load the audio worklet processor for PCM conversion.
-        await audioContext.audioWorklet.addModule('/pcm-processor.js');
-        workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
-
-        // Now mic groes through the worklet node.
-        input.connect(workletNode);
-
-        // Everytime the worklet node receives audio data, this function runs.
-        workletNode.port.onmessage = (event) => {
-          if (isCancelled) return;
-          const inputData = event.data;
-          
+        // Check if we're getting actual audio data (not just silence)
+        const hasAudioData = inputData.some(sample => Math.abs(sample) > 0.001);
+        
+        if (hasAudioData) {
           // Convert Float32Array [-1,1] to Int16 PCM
           const pcm = new Int16Array(inputData.length);
           for (let i = 0; i < inputData.length; i++) {
             pcm[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
           }
           
-          // If websocket is connected, send the PCM data to backend over websocket.
+          // Send PCM data to backend if WebSocket is connected
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
             wsRef.current.send(pcm.buffer);
             setIsProcessing(true);
           }
+        }
+      };
+
+      setConnectionStatus('connected');
+    } catch (error) {
+      console.error("Failed to process audio:", error);
+      setConnectionStatus('error');
+    }
+  };
+
+  // Start processing based on mode
+  useEffect(() => {
+    if (mode === 'live') {
+      // Live mode - start immediately
+      processAudio();
+    } else if (mode === 'video' && videoRef && videoFile) {
+      // Video mode - wait for video to load
+      const handleVideoLoaded = async () => {
+        processAudio();
+      };
+
+      if (videoRef.readyState >= 1) {
+        // Video metadata is already loaded
+        handleVideoLoaded();
+      } else {
+        // Wait for metadata to load
+        videoRef.addEventListener('loadedmetadata', handleVideoLoaded);
+        return () => {
+          videoRef.removeEventListener('loadedmetadata', handleVideoLoaded);
         };
-      } catch (error) {
-        console.error("Failed to start audio streaming:", error);
-        setConnectionStatus('error');
       }
-    };
+    }
 
-    startStreaming();
-
-    // Cleanup function to stop audio processing and close WebSocket connection.
     return () => {
-      isCancelled = true;
+      // Cleanup
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (input) input.disconnect();
-      if (workletNode) workletNode.disconnect();
-      if (audioContext) audioContext.close();
-      if (stream) stream.getTracks().forEach(t => t.stop());
+      if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
+      if (workletNodeRef.current) workletNodeRef.current.disconnect();
+      if (audioContextRef.current) audioContextRef.current.close();
       if (wsRef.current) wsRef.current.close();
     };
-  }, []);
+  }, [mode, videoRef, videoFile]);
 
   // Notify parent of transcript changes
   useEffect(() => {
@@ -163,11 +240,15 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
   }, [transcriptHistory, setTranscriptHistory]);
 
   const getConnectionStatusDisplay = () => {
+    const modeText = mode === 'live' ? 'speech' : 'video audio';
+    
     switch (connectionStatus) {
       case 'connecting': return 'Connecting...';
-      case 'connected': return isProcessing ? '🎤 Processing speech...' : '🟢 Connected';
+      case 'connected': return isProcessing ? `🎤 Processing ${modeText}...` : '🟢 Connected';
       case 'error': return '❌ Connection error';
-      case 'disconnected': return '🔴 Disconnected - Reconnecting...';
+      case 'disconnected': return reconnectAttemptsRef.current > 0 ? 
+        `🔴 Disconnected - Reconnecting... (${reconnectAttemptsRef.current}/5)` : 
+        '🔴 Disconnected';
       default: return 'Unknown status';
     }
   };
@@ -207,4 +288,4 @@ export default function VoiceRecorder({ setVoiceResults, setTranscriptHistory })
       </div>
     </div>
   );
-}
+} 
