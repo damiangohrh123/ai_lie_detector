@@ -1,17 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const emotionColors = {
-  neu: '#9E9E9E',
-  hap: '#FFD700',
-  sad: '#2196F3',
-  ang: '#F44336'
-};
-
-const emotionFullNames = {
-  neu: "Neutral",
-  hap: "Happy",
-  sad: "Sad",
-  ang: "Angry"
+const EMOTIONS = {
+  neu: { name: "Neutral", color: '#9E9E9E' },
+  hap: { name: "Happy", color: '#FFD700' },
+  sad: { name: "Sad", color: '#2196F3' },
+  ang: { name: "Angry", color: '#F44336' }
 };
 
 const WS_URL = "ws://localhost:8000/ws/audio";
@@ -19,9 +12,9 @@ const MOVING_AVG_WINDOW = 3;
 const RECONNECT_DELAY = 3000;
 
 export default function AudioProcessor({ 
-  mode = 'video', // 'live' or 'video'
-  videoFile = null, 
-  videoRef = null, 
+  mode = 'video', // Live (webcam) or video (uploaded) mode
+  videoFile = null, // A file object (e.g. mp4)
+  videoRef = null, // A ref to the video element to get audio stream
   setVoiceResults, 
   setTranscriptHistory 
 }) {
@@ -30,6 +23,7 @@ export default function AudioProcessor({
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isProcessing, setIsProcessing] = useState(false);
   const [voiceEmotionHistory, setVoiceEmotionHistory] = useState([]);
+  
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
   const sourceNodeRef = useRef(null);
@@ -37,33 +31,33 @@ export default function AudioProcessor({
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
 
-  // WebSocket connection and message handling
+  // WebSocket connection
   const connectWebSocket = () => {
-    // If WebSocket is already connected, do nothing. This is to avoid creatng multiple websocket connections.
+    // If already connected, do nothing. Prevent multiple connections.
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    
+    // Sets the status to 'connecting'. Creates a new WebSocket connection to WS_URL.
     setConnectionStatus('connecting');
-
-    // Create a new WebSocket connection
     wsRef.current = new WebSocket(WS_URL);
     wsRef.current.binaryType = "arraybuffer";
 
-    // When connection opens, set status to 'connected', and reset reconnect attempts.
+    // On successful connection, set the status to 'connected' and reset reconnect attempts.
     wsRef.current.onopen = () => {
       setConnectionStatus('connected');
       reconnectAttemptsRef.current = 0;
     };
-
-    // Handle connection errors and set status to 'error'.
+    
+    // On error, log it and set the status to 'error'.
     wsRef.current.onerror = (error) => {
       console.error("WebSocket error:", error);
       setConnectionStatus('error');
     };
     
-    // Handle connection close and set status to 'disconnected'.
+    // On close, set status to 'disconnected' and handle reconnection logic.
     wsRef.current.onclose = () => {
       setConnectionStatus('disconnected');
       
-      // Auto-reconnect with increasing delays after each attempt
+      // Auto-reconnect with increasing delay
       if (reconnectAttemptsRef.current < 5) {
         const delay = RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
@@ -73,27 +67,24 @@ export default function AudioProcessor({
       }
     };
 
-    // Handle incoming messages from backend.
+    // Handle incoming messages from the server (backend).
     wsRef.current.onmessage = (event) => {
       try {
+        // Parse the incoming message as JSON.
         const data = JSON.parse(event.data);
 
-        // Only process final text segments for transcript
-        if (data.type === "text_sentiment" && data.text && data.text.trim()) {
+        // If the message is a text sentiment, add it to results and transcript history.
+        if (data.type === "text_sentiment" && data.text?.trim()) {
           setResults(prev => [...prev, data]);
-          setTranscriptHistoryState(prev => {
-            const newHistory = [...prev, data];
-            return newHistory;
-          });
+          setTranscriptHistoryState(prev => [...prev, data]);
         }
 
-        // Handle voice sentiment for emotion bars
+        // If the message is a voice sentiment, update the voice emotion history and results.
         if (data.type === "voice_sentiment" && data.emotion) {
           setVoiceEmotionHistory(prev => {
             const updated = [...prev, data.emotion];
             return updated.slice(-MOVING_AVG_WINDOW);
           });
-          // Also push to results for fusion
           setResults(prev => [...prev, { ...data, type: "voice_sentiment" }]);
         }
       } catch (e) {
@@ -104,91 +95,83 @@ export default function AudioProcessor({
 
   // Get audio source based on mode
   const getAudioSource = async () => {
-    // If mode is live (webcam), get user media directly
+
+    // If mode is 'live', use getUserMedia to capture audio from the microphone.
     if (mode === 'live') {
       return await navigator.mediaDevices.getUserMedia({ audio: true });
-    } else {
-      // Video mode - try captureStream first, then MediaElementSource
-      if (!videoRef) throw new Error("Video reference required for video mode");
-      
-      try {
-        const stream = videoRef.captureStream();
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length === 0) {
-          throw new Error("No audio tracks in captureStream");
-        }
-        return stream;
-      } catch (error) {
-        // Fallback to MediaElementSource for uploaded files
-        return null; // Will be handled in processAudio
+    }
+    
+    // If mode is 'video', capture audio from the video element.
+    if (!videoRef) throw new Error("Video reference required for video mode");
+    try {
+      const stream = videoRef.captureStream();
+      if (stream.getAudioTracks().length === 0) {
+        throw new Error("No audio tracks in captureStream");
       }
+      return stream;
+    } catch (error) {
+      return null; // Will use MediaElementSource
     }
   };
 
-  // Process audio from any source
-  const processAudio = async () => {
+  // Setup audio processing
+  const setupAudioProcessing = async () => {
+    // Create a new AudioContext with a sample rate of 16000 Hz
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    
+    // Ensure video is playing for video mode
+    if (mode === 'video' && videoRef?.paused) {
+      try {
+        await videoRef.play();
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error("Failed to start video playback:", error);
+      }
+    }
+    
+    // Get audio source based on mode
+    const stream = await getAudioSource();
+    
+    // Create source node based on the stream
+    sourceNodeRef.current = stream 
+      ? audioContextRef.current.createMediaStreamSource(stream)
+      : audioContextRef.current.createMediaElementSource(videoRef);
+
+    // Setup worklet for PCM conversion
+    await audioContextRef.current.audioWorklet.addModule('/pcm-processor.js');
+    workletNodeRef.current = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
+
+    // Connect audio nodes
+    sourceNodeRef.current.connect(workletNodeRef.current);
+    workletNodeRef.current.connect(audioContextRef.current.destination);
+
+    // Process audio data
+    workletNodeRef.current.port.onmessage = (event) => {
+      const inputData = event.data;
+      const hasAudioData = inputData.some(sample => Math.abs(sample) > 0.001);
+      
+      // If there is audio data, convert it to PCM and send it via WebSocket.
+      // This is to skip silent periods and reduce unnecessary data transmission.
+      if (hasAudioData) {
+        const pcm = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          pcm[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
+        }
+        
+        // If WebSocket is open, send the PCM data
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(pcm.buffer);
+          setIsProcessing(true);
+        }
+      }
+    };
+  };
+
+  // Start processing
+  const startProcessing = async () => {
     try {
-      // Connect WebSocket first
       connectWebSocket();
-
-      // Create audio context
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-      
-      if (mode === 'video') {
-        // Ensure video is playing for audio capture
-        if (videoRef && videoRef.paused) {
-          try {
-            await videoRef.play();
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (playError) {
-            console.error("Failed to start video playback:", playError);
-          }
-        }
-      }
-      
-      // Get audio source
-      const stream = await getAudioSource();
-      
-      if (stream) {
-        // Use MediaStreamSource for live audio or captureStream
-        sourceNodeRef.current = audioContextRef.current.createMediaStreamSource(stream);
-      } else {
-        // Use MediaElementSource for uploaded video files
-        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(videoRef);
-      }
-
-      // Load the audio worklet processor for PCM conversion
-      await audioContextRef.current.audioWorklet.addModule('/pcm-processor.js');
-      workletNodeRef.current = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
-
-      // Connect the audio source through the worklet node
-      sourceNodeRef.current.connect(workletNodeRef.current);
-      
-      // Connect to destination to avoid audio context suspension
-      workletNodeRef.current.connect(audioContextRef.current.destination);
-
-      // Process audio data from the worklet
-      workletNodeRef.current.port.onmessage = (event) => {
-        const inputData = event.data;
-        
-        // Check if we're getting actual audio data (not just silence)
-        const hasAudioData = inputData.some(sample => Math.abs(sample) > 0.001);
-        
-        if (hasAudioData) {
-          // Convert Float32Array [-1,1] to Int16 PCM
-          const pcm = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            pcm[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32767));
-          }
-          
-          // Send PCM data to backend if WebSocket is connected
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(pcm.buffer);
-            setIsProcessing(true);
-          }
-        }
-      };
-
+      await setupAudioProcessing();
       setConnectionStatus('connected');
     } catch (error) {
       console.error("Failed to process audio:", error);
@@ -196,31 +179,27 @@ export default function AudioProcessor({
     }
   };
 
-  // Start processing based on mode
+  // Initialize based on mode
   useEffect(() => {
+
+    // Starts processing audio if mode is 'live'.
     if (mode === 'live') {
-      // Live mode - start immediately
-      processAudio();
+      startProcessing();
+
+    // If mode is 'video', wait for the video element to load metadata before starting processing.
     } else if (mode === 'video' && videoRef && videoFile) {
-      // Video mode - wait for video to load
-      const handleVideoLoaded = async () => {
-        processAudio();
-      };
+      const handleVideoLoaded = () => startProcessing();
 
       if (videoRef.readyState >= 1) {
-        // Video metadata is already loaded
         handleVideoLoaded();
       } else {
-        // Wait for metadata to load
         videoRef.addEventListener('loadedmetadata', handleVideoLoaded);
-        return () => {
-          videoRef.removeEventListener('loadedmetadata', handleVideoLoaded);
-        };
+        return () => videoRef.removeEventListener('loadedmetadata', handleVideoLoaded);
       }
     }
 
+    // Cleanup function to disconnect nodes and close WebSocket
     return () => {
-      // Cleanup
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
       if (workletNodeRef.current) workletNodeRef.current.disconnect();
@@ -229,16 +208,25 @@ export default function AudioProcessor({
     };
   }, [mode, videoRef, videoFile]);
 
-  // Notify parent of transcript changes
+  // Notify parent components
   useEffect(() => {
     if (setVoiceResults) setVoiceResults(results);
   }, [results, setVoiceResults]);
 
-  // Notify parent of transcript history changes
   useEffect(() => {
     if (setTranscriptHistory) setTranscriptHistory(transcriptHistory);
   }, [transcriptHistory, setTranscriptHistory]);
 
+  // Calculate average emotion
+  const getAvgEmotion = (emotion) => {
+    const validEmotions = voiceEmotionHistory.filter(e => e[emotion] !== undefined);
+    if (validEmotions.length === 0) return 0;
+    
+    const sum = validEmotions.reduce((acc, e) => acc + e[emotion], 0);
+    return (sum / validEmotions.length) * 100;
+  };
+
+  // Get connection status display
   const getConnectionStatusDisplay = () => {
     const modeText = mode === 'live' ? 'speech' : 'video audio';
     
@@ -253,36 +241,32 @@ export default function AudioProcessor({
     }
   };
 
-  // Moving average for emotion bars
-  const getAvgEmotion = (emotion) => {
-    let sum = 0, count = 0;
-    voiceEmotionHistory.forEach(e => {
-      if (e[emotion] !== undefined) {
-        sum += e[emotion];
-        count++;
-      }
-    });
-    return count > 0 ? (sum / count) * 100 : 0;
-  };
-
   return (
     <div className="voice-container">
-      <div className="voice-connection-status"> {getConnectionStatusDisplay()} </div>
+      <div className="voice-connection-status">{getConnectionStatusDisplay()}</div>
       <div className="voice-analysis-container">
-        {['neu', 'hap', 'sad', 'ang'].map((emotion) => (
-          <div key={emotion} className="voice-analysis-bars">
-            <span className="voice-analysis-bars-label"> {emotionFullNames[emotion] }</span>
+        {Object.entries(EMOTIONS).map(([key, { name, color }]) => (
+          <div key={key} className="voice-analysis-bars">
+            <span className="voice-analysis-bars-label">{name}</span>
             <div className="voice-analysis-bar-background">
               <div style={{
-                width: `${getAvgEmotion(emotion)}%`,
+                width: `${getAvgEmotion(key)}%`,
                 height: '100%',
-                background: emotionColors[emotion] || '#007bff',
+                background: color,
                 borderRadius: 4,
                 transition: 'width 0.4s',
                 opacity: connectionStatus === 'connected' ? 1 : 0.5
               }} />
             </div>
-            <span style={{ width: 50, textAlign: 'right', fontSize: '0.95em', color: '#666', fontWeight: '500' }}>{getAvgEmotion(emotion).toFixed(1)}%</span>
+            <span style={{ 
+              width: 50, 
+              textAlign: 'right', 
+              fontSize: '0.95em', 
+              color: '#666', 
+              fontWeight: '500' 
+            }}>
+              {getAvgEmotion(key).toFixed(1)}%
+            </span>
           </div>
         ))}
       </div>
