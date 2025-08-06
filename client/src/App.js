@@ -60,6 +60,7 @@ function Navigation() {
   );
 }
 
+// Main App.js structure with React Router
 export default function App() {
   return (
     <Router>

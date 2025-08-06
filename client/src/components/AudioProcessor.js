@@ -96,7 +96,7 @@ export default function AudioProcessor({
         if (data.type === "voice_sentiment" && data.emotion) {
           setVoiceEmotionHistory(prev => {
             const updated = [...prev, data.emotion];
-            return updated.slice(-MOVING_AVG_WINDOW);
+            return updated.slice(-MOVING_AVG_WINDOW); // 3 is the window size
           });
           // Also push to results for fusion
           setResults(prev => {

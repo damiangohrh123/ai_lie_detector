@@ -86,24 +86,21 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
   useEffect(() => {
     if (loading) return;
 
+    // TinyFaceDetector setup
     const tinyOptions = new faceapi.TinyFaceDetectorOptions({
       inputSize: 512,
       scoreThreshold: 0.3,
     });
 
-    // Store last 10 frames for smoothing
+    // Store last 5 frames for smoothing
     let emotionHistory = [];
 
     const intervalId = setInterval(async () => {
       // Make sure video is playing and both video and canvas refs exist
-      if (!videoRef.current || !canvasRef.current || videoRef.current.paused || videoRef.current.ended) {
-        return;
-      }
+      if (!videoRef.current || !canvasRef.current || videoRef.current.paused || videoRef.current.ended) return;
 
       // Additional safety check for video dimensions
-      if (!videoRef.current.videoWidth || !videoRef.current.videoHeight) {
-        return;
-      }
+      if (!videoRef.current.videoWidth || !videoRef.current.videoHeight) return;
 
       try {
         // Always clear the canvas before drawing
