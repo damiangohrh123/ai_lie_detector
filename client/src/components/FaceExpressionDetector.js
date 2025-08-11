@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as faceapi from 'face-api.js';
+import PerformanceMonitor from '../utils/PerformanceMonitor';
 
 const MODEL_URL = '/models';
 
@@ -8,20 +9,19 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
   const canvasRef = useRef();
   const [loading, setLoading] = useState(true);
   const [smoothedEmotions, setSmoothedEmotions] = useState([]);
+  const updateTimeoutRef = useRef(null);
+
+  // Performance monitoring (Comment out if not testing)
+  // const performanceMonitor = useRef(new PerformanceMonitor('FaceDetection'));
 
   useEffect(() => {
     async function loadModels() {
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
       setLoading(false);
-      
-      if (videoFile) {
-        // Use uploaded video file
-        startVideoFile();
-      } else {
-        // Use webcam
-        startWebcam();
-      }
+
+      // If videoFile is provided, start video file playback. Else, start webcam.
+      videoFile ? startVideoFile() : startWebcam();
     }
 
     function startVideoFile() {
@@ -29,7 +29,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
         const videoUrl = URL.createObjectURL(videoFile);
         videoRef.current.src = videoUrl;
         videoRef.current.load();
-        
+
         // Wait for video to be loaded before attempting to play
         const playVideo = () => {
           videoRef.current.play().then(() => {
@@ -49,7 +49,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
         videoRef.current.addEventListener('loadedmetadata', () => {
           playVideo();
         });
-        
+
         // Also try to play when canplay event fires
         videoRef.current.addEventListener('canplay', () => {
           if (videoRef.current.paused) {
@@ -75,7 +75,9 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
         }
       })
         .then(stream => {
-          if (videoRef.current) videoRef.current.srcObject = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
         })
         .catch(err => console.error('Error accessing webcam:', err));
     }
@@ -88,12 +90,16 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
 
     // TinyFaceDetector setup
     const tinyOptions = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 512,
-      scoreThreshold: 0.3,
+      inputSize: 224,
+      scoreThreshold: 0.5,
     });
 
-    // Store last 5 frames for smoothing
-    let emotionHistory = [];
+    // Cache canvas context to avoid repeated getContext calls
+    const ctx = canvasRef.current.getContext('2d');
+
+    // Smart face skipping variables
+    let noFaceCount = 0;
+    let frameSkipCount = 0;
 
     const intervalId = setInterval(async () => {
       // Make sure video is playing and both video and canvas refs exist
@@ -102,15 +108,37 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
       // Additional safety check for video dimensions
       if (!videoRef.current.videoWidth || !videoRef.current.videoHeight) return;
 
-      try {
-        // Always clear the canvas before drawing
-        const ctx = canvasRef.current.getContext('2d');
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      // Adaptive frame skipping for performance consistency
+      if (frameSkipCount >= 2) {
+        frameSkipCount = 0; // Reset counter
+        return; // Skip this frame
+      }
 
-        // Detect facial expression
+      try {
+        // START TIMING - Frame analysis begins
+        // const frameStartTime = performance.now();
+
+        // Detect facial expression using original video
+        const detectionStartTime = performance.now();
+
+        // Use original tinyOptions for compatibility
         const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
+        const detectionTime = performance.now() - detectionStartTime;
 
         if (result) {
+          // Update face detection tracking
+          noFaceCount = 0;
+
+          // Only clear the area around the detected face
+          const box = result.detection.box;
+          const clearMargin = 20; // Extra margin around face for safety
+          ctx.clearRect(
+            box.x - clearMargin,
+            box.y - clearMargin,
+            box.width + (clearMargin * 2),
+            box.height + (clearMargin * 2)
+          );
+
           // Draw the bounding box on the detected face
           const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
           const resized = faceapi.resizeResults(result, dims);
@@ -127,33 +155,64 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
             fearful: (expressions.fearful || 0) + (expressions.surprised || 0),
           };
 
-          // Rolling average over last 5 frames
-          emotionHistory = [...emotionHistory, grouped].slice(-5);
-          const averaged = {};
-          for (const key of Object.keys(grouped)) {
-            const total = emotionHistory.reduce((sum, e) => sum + (e[key] || 0), 0);
-            averaged[key] = total / emotionHistory.length;
-          }
+          // Create emotions array directly from current detection
+          const allEmotions = [
+            { emotion: 'neutral', probability: parseFloat((grouped.neutral * 100).toFixed(1)) },
+            { emotion: 'happy', probability: parseFloat((grouped.happy * 100).toFixed(1)) },
+            { emotion: 'sad', probability: parseFloat((grouped.sad * 100).toFixed(1)) },
+            { emotion: 'angry', probability: parseFloat((grouped.angry * 100).toFixed(1)) },
+            { emotion: 'disgusted', probability: parseFloat((grouped.disgusted * 100).toFixed(1)) },
+            { emotion: 'fearful', probability: parseFloat((grouped.fearful * 100).toFixed(1)) }
+          ];
 
-          const allEmotions = Object.entries(averaged).map(([emotion, prob]) => ({
-            emotion,
-            probability: parseFloat((prob * 100).toFixed(1)),
-          }));
-          setSmoothedEmotions(allEmotions);
+          // END TIMING (Comment out if not testing)
+          // performanceMonitor.current.end(true);
+
+          // Adaptive frame skipping for performance consistency
+           if (detectionTime > 200) { // If detection takes too long
+             frameSkipCount++;
+           } else {
+             frameSkipCount = 0; // Reset counter if performance is good
+           }
+        
+          // Debounced state update to reduce re-renders
+          if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current);
+          }
+          updateTimeoutRef.current = setTimeout(() => {
+            setSmoothedEmotions(allEmotions);
+          }, 50); // 50ms debounce
         } else {
-          setSmoothedEmotions([]);
-          emotionHistory = [];
+          // Smart face skipping: only process after 3 consecutive no-face frames
+          noFaceCount++;
+
+          if (noFaceCount >= 3) {
+            // Clear canvas when no face is detected for 3+ frames
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+            // END TIMING (Comment out if not testing)
+            // performanceMonitor.current.end(false);
+
+            setSmoothedEmotions([]);
+            noFaceCount = 0; // Reset counter after clearing
+          }
+          // If noFaceCount < 3, keep previous face detection visible
         }
       } catch (error) {
         // Handle any errors that might occur during face detection
         console.warn('Face detection error:', error);
         setSmoothedEmotions([]);
-        emotionHistory = [];
       }
     }, 300);
 
     return () => {
       clearInterval(intervalId);
+
+      // Clean up debounced updates
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+
       // Clean up video stream when component unmounts
       if (videoRef.current && videoRef.current.srcObject) {
         const tracks = videoRef.current.srcObject.getTracks();
