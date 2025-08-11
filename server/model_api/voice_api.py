@@ -6,6 +6,8 @@ import torch
 import torchaudio
 import numpy as np
 import httpx    
+import time
+import logging
 
 # Import Wav2Vec2 model
 from transformers import (
@@ -20,6 +22,10 @@ import noisereduce as nr
 import webrtcvad
 import asyncio
 from scipy.signal import butter, lfilter
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -46,10 +52,14 @@ def bandpass_filter(data, lowcut, highcut, fs, order=4):
     return y
 
 def analyze_emotion(audio_tensor, sr):
+    start_time = time.time()
     inputs = emotion_processor(audio_tensor.squeeze().numpy(), sampling_rate=sr, return_tensors="pt")
     with torch.no_grad():
         logits = emotion_model(**inputs).logits
     probs = torch.nn.functional.softmax(logits[0], dim=-1)
+    
+    emotion_time = time.time() - start_time
+    logger.info(f"Emotion analysis completed in {emotion_time:.4f} seconds")
 
     # Returns a dictionary. E.g. { "ang": 0.02, "hap": 0.87, "neu": 0.05, "sad": 0.06 }
     return {label: round(float(probs[i]), 4) for i, label in enumerate(emotion_labels)}
@@ -188,11 +198,20 @@ async def websocket_audio(websocket: WebSocket):
                 final_text = result.get("text", "")
 
                 if final_text.strip():
+                    transcript_start_time = time.time()
                     last_transcript = final_text
+                    logger.info(f"Transcript received: '{final_text}'")
+                    
                     # Text sentiment analysis: call the /api/text-sentiment endpoint
+                    sentiment_start_time = time.time()
                     async with httpx.AsyncClient() as client:
                         resp = await client.post("http://localhost:8000/api/text-sentiment", json={"text": final_text})
                         sentiment = resp.json()
+                    sentiment_time = time.time() - sentiment_start_time
+                    
+                    total_transcript_time = time.time() - transcript_start_time
+                    logger.info(f"Text sentiment analysis completed in {sentiment_time:.4f} seconds, total transcript processing: {total_transcript_time:.4f} seconds")
+                    
                     await websocket.send_text(json.dumps({
                         "type": "text_sentiment",
                         "text": final_text,

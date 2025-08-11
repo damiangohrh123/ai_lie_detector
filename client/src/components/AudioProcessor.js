@@ -76,9 +76,6 @@ export default function AudioProcessor({
     wsRef.current.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type !== "partial") {
-          console.log("Received from backend:", data);
-        }
 
         // Only process final text segments for transcript
         if (data.type === "text_sentiment" && data.text && data.text.trim()) {
