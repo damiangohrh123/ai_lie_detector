@@ -43,6 +43,16 @@ def butter_bandpass(lowcut, highcut, fs, order=4):
     nyq = 0.5 * fs
     low = lowcut / nyq
     high = highcut / nyq
+    
+    # Ensure frequencies are within valid range (0 < Wn < 1)
+    low = max(0.001, min(0.999, low))
+    high = max(0.001, min(0.999, high))
+    
+    # Ensure low < high
+    if low >= high:
+        low = 0.001
+        high = 0.999
+    
     b, a = butter(order, [low, high], btype='band')
     return b, a
 
@@ -51,18 +61,79 @@ def bandpass_filter(data, lowcut, highcut, fs, order=4):
     y = lfilter(b, a, data)
     return y
 
+def audio_preprocessing(audio_data, sample_rate):
+    try:
+        # Validate inputs
+        if sample_rate <= 0:
+            logger.error(f"Invalid sample rate: {sample_rate}")
+            return audio_data
+        
+        if len(audio_data) == 0:
+            logger.error("Empty audio data")
+            return audio_data
+        
+        # Bandpass filter 80-8000 Hz
+        filtered = bandpass_filter(audio_data, 80, 8000, sample_rate)
+        
+        # Apply pre-emphasis filter to enhance high frequencies
+        alpha = 0.97
+        emphasized = np.append(filtered[0], filtered[1:] - alpha * filtered[:-1])
+        
+        # Noise reduction using spectral gating
+        noise_samples = int(0.1 * sample_rate)
+        if len(emphasized) > noise_samples:
+            noise_floor = np.mean(np.abs(emphasized[:noise_samples]))
+            threshold = noise_floor * 2
+            emphasized = np.where(np.abs(emphasized) < threshold, 0, emphasized)
+        
+        # Normalization to [-1, 1] range
+        if np.max(np.abs(emphasized)) > 0:
+            emphasized = emphasized / np.max(np.abs(emphasized))
+        
+        return emphasized
+        
+    except Exception as e:
+        logger.error(f"Audio preprocessing error: {e}")
+        # Return original audio data on error
+        return audio_data
+
 def analyze_emotion(audio_tensor, sr):
     start_time = time.time()
-    inputs = emotion_processor(audio_tensor.squeeze().numpy(), sampling_rate=sr, return_tensors="pt")
-    with torch.no_grad():
-        logits = emotion_model(**inputs).logits
-    probs = torch.nn.functional.softmax(logits[0], dim=-1)
     
-    emotion_time = time.time() - start_time
-    logger.info(f"Emotion analysis completed in {emotion_time:.4f} seconds")
-
-    # Returns a dictionary. E.g. { "ang": 0.02, "hap": 0.87, "neu": 0.05, "sad": 0.06 }
-    return {label: round(float(probs[i]), 4) for i, label in enumerate(emotion_labels)}
+    # Ensure audio is in the right format for the model
+    if audio_tensor.dtype != torch.float32:
+        audio_tensor = audio_tensor.float()
+    
+    # Ensure proper normalization to [-1, 1] range
+    if torch.max(torch.abs(audio_tensor)) > 0:
+        audio_tensor = audio_tensor / torch.max(torch.abs(audio_tensor))
+    
+    # Ensure correct shape for the model
+    if len(audio_tensor.shape) == 1:
+        audio_tensor = audio_tensor.unsqueeze(0)
+    
+    # Convert to numpy for the processor
+    audio_numpy = audio_tensor.squeeze().numpy()
+    
+    # Process audio
+    try:
+        inputs = emotion_processor(audio_numpy, sampling_rate=sr, return_tensors="pt", padding=True)
+        
+        with torch.no_grad():
+            logits = emotion_model(**inputs).logits
+        
+        probs = torch.nn.functional.softmax(logits[0], dim=-1)
+        
+        emotion_time = time.time() - start_time
+        logger.info(f"Emotion analysis completed in {emotion_time:.4f} seconds")
+        
+        # Returns a dictionary. E.g. { "ang": 0.02, "hap": 0.87, "neu": 0.05, "sad": 0.06 }
+        return {label: round(float(probs[i]), 4) for i, label in enumerate(emotion_labels)}
+        
+    except Exception as e:
+        logger.error(f"Emotion detection error: {e}")
+        # Return neutral as fallback
+        return {label: 0.0 if label != "neu" else 1.0 for label in emotion_labels}
 
 def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
     # Creates a VAD object
@@ -149,8 +220,8 @@ async def websocket_audio(websocket: WebSocket):
     sample_rate = 16000
     recognizer = KaldiRecognizer(vosk_model, sample_rate) # Creates a Vosk recognizer instance
     audio_buffer = bytearray()  # Buffer for sliding window (voice sentiment)
-    window_seconds = 2 # 2 seconds window size for emotion analysis
-    window_size = window_seconds * sample_rate * 2  # 2 bytes per int16 sample
+    window_seconds = 1.5 # 1.5 seconds window size for better emotion detection
+    window_size = int(window_seconds * sample_rate * 2)  # 2 bytes per int16 sample, ensure integer
     stop_task = False
 
     async def perform_voice_sentiment():
@@ -159,26 +230,51 @@ async def websocket_audio(websocket: WebSocket):
                 # Get the most recent window_size bytes
                 window_bytes = audio_buffer[-window_size:]
                 audio_np = np.frombuffer(window_bytes, dtype=np.int16).astype(np.float32) / 32767.0
-                # Apply band-pass filter for speech (300-3400 Hz)
-                filtered_audio = bandpass_filter(audio_np, 300, 3400, sample_rate)
-                segment_tensor = torch.tensor(filtered_audio).unsqueeze(0)
+                
                 try:
-                    # Run VAD to check for speech
-                    speech_segments = vad(segment_tensor, sample_rate, aggressiveness=3)
+                    # VAD check on raw audio first
+                    speech_segments = vad(torch.tensor(audio_np).unsqueeze(0), sample_rate, aggressiveness=2)
+                    
                     if speech_segments:
-                        emotion = analyze_emotion(segment_tensor, sample_rate)
-                        await websocket.send_text(json.dumps({
-                            "type": "voice_sentiment",
-                            "emotion": emotion
-                        }))
+                        # Calculate speech ratio to avoid processing very short speech
+                        total_speech = sum(end - start for start, end in speech_segments)
+                        speech_ratio = total_speech / window_seconds
+                        
+                        # Only process if speech ratio is high enough (>30%)
+                        if speech_ratio > 0.3:
+                            # Run audio preprocessing only when needed
+                            filtered_audio = audio_preprocessing(audio_np, sample_rate)
+                            segment_tensor = torch.tensor(filtered_audio).unsqueeze(0)
+                            
+                            # Analyze emotion on preprocessed audio
+                            emotion = analyze_emotion(segment_tensor, sample_rate)
+                            await websocket.send_text(json.dumps({
+                                "type": "voice_sentiment",
+                                "emotion": emotion,
+                                "speech_ratio": round(speech_ratio, 2)
+                            }))
+                        else:
+                            # Low speech activity - send neutral
+                            await websocket.send_text(json.dumps({
+                                "type": "voice_sentiment",
+                                "emotion": {label: 0.0 for label in emotion_labels},
+                                "speech_ratio": round(speech_ratio, 2)
+                            }))
                     else:
                         # No speech detected: send zeros
                         await websocket.send_text(json.dumps({
                             "type": "voice_sentiment",
-                            "emotion": {label: 0.0 for label in emotion_labels}
+                            "emotion": {label: 0.0 for label in emotion_labels},
+                            "speech_ratio": 0.0
                         }))
                 except Exception as e:
-                    print(f"Voice sentiment error: {e}")
+                    logger.error(f"Voice sentiment error: {e}")
+                    # Send neutral emotion on error so client knows something happened
+                    await websocket.send_text(json.dumps({
+                        "type": "voice_sentiment",
+                        "emotion": {label: 0.0 if label != "neu" else 1.0 for label in emotion_labels},
+                        "error": str(e)
+                    }))
             await asyncio.sleep(1)
 
     voice_sentiment_task = asyncio.create_task(perform_voice_sentiment())
@@ -225,7 +321,7 @@ async def websocket_audio(websocket: WebSocket):
                     "text": partial.get("partial", "")
                 }))
     except Exception as e:
-        print("WebSocket closed or error:", e)
+        logger.error(f"WebSocket closed or error: {e}")
     finally:
         stop_task = True
         await voice_sentiment_task
