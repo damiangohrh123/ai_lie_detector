@@ -177,7 +177,7 @@ export default function FileUploadPage() {
             </section>
             <section className="face-section">
               <h2 className="section-label">😀 Face Analysis</h2>
-              <FaceAnalysisBars smoothedEmotions={faceEmotions} />
+              <FaceAnalysisBars currentEmotions={faceEmotions} />
             </section>
           </>
         ) : (

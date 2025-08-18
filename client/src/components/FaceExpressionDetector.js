@@ -8,7 +8,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
   const videoRef = useRef();
   const canvasRef = useRef();
   const [loading, setLoading] = useState(true);
-  const [smoothedEmotions, setSmoothedEmotions] = useState([]);
+  const [currentEmotions, setCurrentEmotions] = useState([]);
   const updateTimeoutRef = useRef(null);
 
   // Performance monitoring (Comment out if not testing)
@@ -115,8 +115,9 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
       }
 
       try {
-        // START TIMING - Frame analysis begins
-        // const frameStartTime = performance.now();
+        // START TIMING - Frame analysis begins (Comment out if not testing)
+        //const frameStartTime = performance.now();
+        //performanceMonitor.current.start();
 
         // Detect facial expression using original video
         const detectionStartTime = performance.now();
@@ -166,7 +167,11 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
           ];
 
           // END TIMING (Comment out if not testing)
-          // performanceMonitor.current.end(true);
+          //performanceMonitor.current.end(true);
+          
+          // Immediate logging for testing (Comment out if not testing)
+          //const processingTime = performance.now() - frameStartTime;
+          //console.log(`Frame processed in ${processingTime.toFixed(0)}ms - SUCCESS`);
 
           // Adaptive frame skipping for performance consistency
            if (detectionTime > 200) { // If detection takes too long
@@ -180,20 +185,19 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
             clearTimeout(updateTimeoutRef.current);
           }
           updateTimeoutRef.current = setTimeout(() => {
-            setSmoothedEmotions(allEmotions);
+            setCurrentEmotions(allEmotions);
           }, 50); // 50ms debounce
         } else {
-          // Smart face skipping: only process after 3 consecutive no-face frames
+          // Only process after 3 consecutive no-face frames
           noFaceCount++;
-
           if (noFaceCount >= 3) {
             // Clear canvas when no face is detected for 3+ frames
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
             // END TIMING (Comment out if not testing)
-            // performanceMonitor.current.end(false);
+            //performanceMonitor.current.end(false);
 
-            setSmoothedEmotions([]);
+            setCurrentEmotions([]);
             noFaceCount = 0; // Reset counter after clearing
           }
           // If noFaceCount < 3, keep previous face detection visible
@@ -201,7 +205,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
       } catch (error) {
         // Handle any errors that might occur during face detection
         console.warn('Face detection error:', error);
-        setSmoothedEmotions([]);
+        setCurrentEmotions([]);
       }
     }, 300);
 
@@ -227,8 +231,8 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
 
   // Send emotions to parent
   useEffect(() => {
-    if (onEmotionsUpdate) onEmotionsUpdate(smoothedEmotions);
-  }, [smoothedEmotions, onEmotionsUpdate]);
+    if (onEmotionsUpdate) onEmotionsUpdate(currentEmotions);
+  }, [currentEmotions, onEmotionsUpdate]);
 
   // Send video ref to parent for audio processing
   useEffect(() => {

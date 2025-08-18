@@ -18,11 +18,11 @@ const emotionFullNames = {
   fearful: "Fear",
 };
 
-export default function FaceAnalysisBars({ smoothedEmotions }) {
+export default function FaceAnalysisBars({ currentEmotions }) {
   return (
     <div className="face-analysis-container">
       {['neutral', 'happy', 'sad', 'angry', 'disgusted', 'fearful'].map((emotion) => {
-        const match = smoothedEmotions.find((e) => e.emotion === emotion);
+        const match = currentEmotions.find((e) => e.emotion === emotion);
         const probability = match ? match.probability : 0;
         return (
           <div key={emotion} className="face-analysis-bars">
