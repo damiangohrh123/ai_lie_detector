@@ -91,9 +91,15 @@ export default function AudioProcessor({
 
         // Handle voice sentiment for emotion bars
         if (data.type === "voice_sentiment" && data.emotion) {
+          // Add timestamp to emotion data latest emotions check
+          const emotionWithTimestamp = {
+            ...data.emotion,
+            timestamp: Date.now()
+          };
+          
           setVoiceEmotionHistory(prev => {
-            const updated = [...prev, data.emotion];
-            return updated.slice(-MOVING_AVG_WINDOW); // 3 is the window size
+            const updated = [...prev, emotionWithTimestamp];
+            return updated.slice(-MOVING_AVG_WINDOW); // Window size is 3
           });
           // Also push to results for fusion
           setResults(prev => {
@@ -245,13 +251,44 @@ export default function AudioProcessor({
     if (setTranscriptHistory) setTranscriptHistory(transcriptHistory);
   }, [transcriptHistory, setTranscriptHistory]);
 
+  // Clean up old emotions periodically to reset bars when no recent sentiments
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      setVoiceEmotionHistory(prev => {
+        const recentEmotions = prev.filter(e => {
+          if (e.timestamp) {
+            return (now - e.timestamp) < 3000; // Keep only emotions from last 3 seconds
+          }
+          return false; // Only keep emotions with timestamps
+        });
+        return recentEmotions;
+      });
+    }, 1000); // Check every second
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
+
   // Calculate average emotion
   const getAvgEmotion = (emotion) => {
     const validEmotions = voiceEmotionHistory.filter(e => e[emotion] !== undefined);
     if (validEmotions.length === 0) return 0;
     
-    const sum = validEmotions.reduce((acc, e) => acc + e[emotion], 0);
-    return (sum / validEmotions.length) * 100;
+    // Check for voice sentiments within the last 3 seconds.
+    const now = Date.now();
+    const recentEmotions = validEmotions.filter(e => {
+      // Only process emotions with timestamps
+      if (e.timestamp) {
+        return (now - e.timestamp) < 3000;
+      }
+      return false;
+    });
+    
+    // If no recent emotions, return 0 to reset bars
+    if (recentEmotions.length === 0) return 0;
+    
+    const sum = recentEmotions.reduce((acc, e) => acc + e[emotion], 0);
+    return (sum / recentEmotions.length) * 100;
   };
 
   // Get connection status display

@@ -28,7 +28,8 @@ async def text_sentiment(request: Request):
 
     # If text is empty, return NEUTRAL sentiment
     if not text.strip():
-        logger.info(f"Empty text received, returning NEUTRAL in {time.time() - start_time:.4f} seconds")
+        # Comment out if not testing
+        # logger.info(f"Empty text received, returning NEUTRAL in {time.time() - start_time:.4f} seconds")
         return {"label": "NEUTRAL", "score": 0.0, "text": text}
 
     try:
@@ -52,7 +53,8 @@ async def text_sentiment(request: Request):
         label = "truthful" if predicted_label == 0 else "deceptive"
         
         total_time = time.time() - start_time
-        logger.info(f"Text analysis completed - Text: '{text[:50]}{'...' if len(text) > 50 else ''}', Label: {label}, Confidence: {confidence:.4f}, Tokenization: {tokenize_time:.4f}s, Inference: {inference_time:.4f}s, Total: {total_time:.4f}s")
+        # Comment out if not testing
+        # logger.info(f"📝 Text analysis completed - Text: '{text[:50]}{'...' if len(text) > 50 else ''}', Total: {total_time:.4f}s")
         
         return {
             "label": label, 
@@ -63,5 +65,6 @@ async def text_sentiment(request: Request):
         
     except Exception as e:
         error_time = time.time() - start_time
-        logger.error(f"Text sentiment analysis error in {error_time:.4f} seconds: {e}")
+        # Comment out if not testing
+        # logger.error(f"Text sentiment analysis error in {error_time:.4f} seconds: {e}")
         return {"label": "NEUTRAL", "score": 0.0, "text": text, "error": str(e)} 
