@@ -71,7 +71,6 @@ export default function FileUploadPage() {
   }
 
   // Track the latest fusion score for the timeline
-  const fusionScoreRef = useRef(null);
   useEffect(() => {
     // Listen for changes in the fusion score from FusionTruthfulness
     if (fusionScore !== null && fusionScore !== undefined) {

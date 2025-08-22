@@ -12,7 +12,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
   const updateTimeoutRef = useRef(null);
 
   // Performance monitoring (Comment out if not testing)
-  // const performanceMonitor = useRef(new PerformanceMonitor('FaceDetection'));
+  const performanceMonitor = useRef(new PerformanceMonitor('FaceDetection'));
 
   useEffect(() => {
     async function loadModels() {
@@ -116,8 +116,8 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
 
       try {
         // START TIMING - Frame analysis begins (Comment out if not testing)
-        //const frameStartTime = performance.now();
-        //performanceMonitor.current.start();
+        const frameStartTime = performance.now();
+        performanceMonitor.current.start();
 
         // Detect facial expression using original video
         const detectionStartTime = performance.now();
@@ -167,11 +167,11 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
           ];
 
           // END TIMING (Comment out if not testing)
-          //performanceMonitor.current.end(true);
+          performanceMonitor.current.end(true);
           
           // Immediate logging for testing (Comment out if not testing)
-          //const processingTime = performance.now() - frameStartTime;
-          //console.log(`Frame processed in ${processingTime.toFixed(0)}ms - SUCCESS`);
+          const processingTime = performance.now() - frameStartTime;
+          console.log(`Frame processed in ${processingTime.toFixed(0)}ms - SUCCESS`);
 
           // Adaptive frame skipping for performance consistency
            if (detectionTime > 200) { // If detection takes too long
@@ -195,7 +195,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
             ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
             // END TIMING (Comment out if not testing)
-            //performanceMonitor.current.end(false);
+            performanceMonitor.current.end(false);
 
             setCurrentEmotions([]);
             noFaceCount = 0; // Reset counter after clearing
