@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import FaceExpressionDetector from '../components/FaceExpressionDetector';
+import FaceExpressionDetector from '../components/MediaPipeFaceDetector';
 import AudioProcessor from '../components/AudioProcessor';
 import FaceAnalysisBars from '../components/FaceAnalysisBars';
 import TextAnalysis from '../components/TextAnalysis';
