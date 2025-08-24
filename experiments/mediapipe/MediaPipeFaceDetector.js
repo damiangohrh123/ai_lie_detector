@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import PerformanceMonitor from '../utils/PerformanceMonitor';
+import PerformanceMonitor from '../../client/src/utils/PerformanceMonitor';
 import { FaceMesh } from '@mediapipe/face_mesh';
 import * as faceapi from 'face-api.js';
 
