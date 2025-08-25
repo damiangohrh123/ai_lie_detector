@@ -7,86 +7,89 @@ const MODEL_URL = '/models';
 export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = null, onVideoRef = null }) {
   const videoRef = useRef();
   const canvasRef = useRef();
-  const [loading, setLoading] = useState(true);
   const [currentEmotions, setCurrentEmotions] = useState([]);
-  const updateTimeoutRef = useRef(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const dimsRef = useRef(null);
 
   // Performance monitoring (Comment out if not testing)
   const performanceMonitor = useRef(new PerformanceMonitor('FaceDetection'));
 
   useEffect(() => {
     async function loadModels() {
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
-      setLoading(false);
+      try {
+        await Promise.all([
+          // Load face detection model and expression recognition model
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+        ]);
+        setModelsLoaded(true);
 
-      // If videoFile is provided, start video file playback. Else, start webcam.
-      videoFile ? startVideoFile() : startWebcam();
+        // After models are loaded, decide whether to use video file or webcam
+        videoFile ? startVideoFile() : startWebcam();
+      } catch (error) {
+        console.error('Error loading models:', error);
+      }
     }
 
+    // Function for starting video file playback
     function startVideoFile() {
       if (videoRef.current && videoFile) {
         const videoUrl = URL.createObjectURL(videoFile);
         videoRef.current.src = videoUrl;
-        videoRef.current.load();
 
-        // Wait for video to be loaded before attempting to play
+        // Function to try to play video. If error, retry after 1 second.
         const playVideo = () => {
-          videoRef.current.play().then(() => {
-            // Video started successfully
-          }).catch(err => {
+          videoRef.current.play().catch(err => {
             console.error('Error playing video:', err);
-            // Try again after a short delay
-            setTimeout(() => {
-              videoRef.current.play().catch(e => {
-                console.error('Second attempt to play video failed:', e);
-              });
-            }, 1000);
+            setTimeout(() => videoRef.current.play().catch(console.error), 1000);
           });
         };
 
-        // Try to play when metadata is loaded
-        videoRef.current.addEventListener('loadedmetadata', () => {
+        const onMetadataLoaded = () => {
+          // Cache dimensions once when video metadata loads
+          if (canvasRef.current && videoRef.current) {
+            dimsRef.current = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
+          }
           playVideo();
-        });
+        };
 
-        // Also try to play when canplay event fires
-        videoRef.current.addEventListener('canplay', () => {
-          if (videoRef.current.paused) {
-            playVideo();
-          }
-        });
-
-        // Try to play when loadeddata event fires
-        videoRef.current.addEventListener('loadeddata', () => {
-          if (videoRef.current.paused) {
-            playVideo();
-          }
-        });
+        videoRef.current.addEventListener('loadedmetadata', onMetadataLoaded, { once: true });
       }
     }
 
+    // Function for starting webcam
     function startWebcam() {
+      // Request access to user's webcam
       navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 960 },
+          height: { ideal: 540 },
           facingMode: 'user',
         }
       })
+        // If permission granted, start video stream
         .then(stream => {
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
+
+            // Cache dimensions once when webcam metadata loads
+            const onMetadataLoaded = () => {
+              if (canvasRef.current && videoRef.current) {
+                dimsRef.current = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
+              }
+            };
+
+            videoRef.current.addEventListener('loadedmetadata', onMetadataLoaded, { once: true });
           }
         })
         .catch(err => console.error('Error accessing webcam:', err));
     }
-
+    // Load both face detection and expression recognition models.
     loadModels();
   }, [videoFile]);
 
   useEffect(() => {
-    if (loading) return;
+    if (!modelsLoaded) return;
 
     // TinyFaceDetector setup
     const tinyOptions = new faceapi.TinyFaceDetectorOptions({
@@ -94,24 +97,27 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
       scoreThreshold: 0.5,
     });
 
-    // Cache canvas context to avoid repeated getContext calls
-    const ctx = canvasRef.current.getContext('2d');
+    // Cache the 2D drawing canvas context to avoid repeated getContext calls.
+    let ctx = canvasRef.current.getContext('2d');
+    let lastFaceRegion = null;
 
-    // Smart face skipping variables
+    // Smart face skipping variables.
     let noFaceCount = 0;
-    let frameSkipCount = 0;
+    let lastProcessTime = 0;
+    const PROCESS_INTERVAL = 200; // Process every 200ms
+    let animationFrameId;
 
-    const intervalId = setInterval(async () => {
-      // Make sure video is playing and both video and canvas refs exist
-      if (!videoRef.current || !canvasRef.current || videoRef.current.paused || videoRef.current.ended) return;
+    const processFrame = async (timestamp) => {
+      // Limits how often detection runs based on PROCESS_INTERVAL.
+      if (timestamp - lastProcessTime < PROCESS_INTERVAL) {
+        animationFrameId = requestAnimationFrame(processFrame);
+        return;
+      }
 
-      // Additional safety check for video dimensions
-      if (!videoRef.current.videoWidth || !videoRef.current.videoHeight) return;
-
-      // Adaptive frame skipping for performance consistency
-      if (frameSkipCount >= 2) {
-        frameSkipCount = 0; // Reset counter
-        return; // Skip this frame
+      // Ensure video is playing and both video and canvas refs exist
+      if (!videoRef.current || !canvasRef.current || videoRef.current.paused || videoRef.current.ended) {
+        animationFrameId = requestAnimationFrame(processFrame);
+        return;
       }
 
       try {
@@ -119,102 +125,97 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
         const frameStartTime = performance.now();
         performanceMonitor.current.start();
 
-        // Detect facial expression using original video
-        const detectionStartTime = performance.now();
-
-        // Use original tinyOptions for compatibility
+        // Detect face and expressions. tinyOptions specifies detector variables. withFaceExpressions returns probabilities for emotions.
         const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
-        const detectionTime = performance.now() - detectionStartTime;
 
+        // If a face is detected.
         if (result) {
-          // Update face detection tracking
+          // Reset noFaceCount counter to indicate a face is present.
           noFaceCount = 0;
 
-          // Only clear the area around the detected face
+          // Optimize canvas clearing with dirty region tracking. Add padding of -30 and +60 to ensure region fully covers bounding box.
           const box = result.detection.box;
-          const clearMargin = 20; // Extra margin around face for safety
-          ctx.clearRect(
-            box.x - clearMargin,
-            box.y - clearMargin,
-            box.width + (clearMargin * 2),
-            box.height + (clearMargin * 2)
-          );
-
-          // Draw the bounding box on the detected face
-          const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
-          const resized = faceapi.resizeResults(result, dims);
-          faceapi.draw.drawDetections(canvasRef.current, resized);
-
-          // Get the expressions (combine surprised and fearful)
-          const { expressions = {} } = resized;
-          const grouped = {
-            neutral: expressions.neutral || 0,
-            happy: expressions.happy || 0,
-            sad: expressions.sad || 0,
-            angry: expressions.angry || 0,
-            disgusted: expressions.disgusted || 0,
-            fearful: (expressions.fearful || 0) + (expressions.surprised || 0),
+          const currentRegion = {
+            x: Math.max(0, box.x - 30),
+            y: Math.max(0, box.y - 30),
+            width: Math.min(canvasRef.current.width - Math.max(0, box.x - 30), box.width + 60),
+            height: Math.min(canvasRef.current.height - Math.max(0, box.y - 30), box.height + 60)
           };
 
-          // Create emotions array directly from current detection
+          // Clear union of previous and current regions.
+          if (lastFaceRegion) {
+            const unionRegion = {
+              x: Math.min(lastFaceRegion.x, currentRegion.x),
+              y: Math.min(lastFaceRegion.y, currentRegion.y),
+              width: Math.max(lastFaceRegion.x + lastFaceRegion.width, currentRegion.x + currentRegion.width) - Math.min(lastFaceRegion.x, currentRegion.x),
+              height: Math.max(lastFaceRegion.y + lastFaceRegion.height, currentRegion.y + currentRegion.height) - Math.min(lastFaceRegion.y, currentRegion.y)
+            };
+            ctx.clearRect(unionRegion.x, unionRegion.y, unionRegion.width, unionRegion.height);
+          } else {
+            ctx.clearRect(currentRegion.x, currentRegion.y, currentRegion.width, currentRegion.height);
+          }
+
+          lastFaceRegion = currentRegion;
+
+          // Draw the bounding box on the detected face.
+          const resized = faceapi.resizeResults(result, dimsRef.current);
+          faceapi.draw.drawDetections(canvasRef.current, resized);
+
+          // Get the expressions and create emotions array directly
+          const { expressions = {} } = resized;
           const allEmotions = [
-            { emotion: 'neutral', probability: parseFloat((grouped.neutral * 100).toFixed(1)) },
-            { emotion: 'happy', probability: parseFloat((grouped.happy * 100).toFixed(1)) },
-            { emotion: 'sad', probability: parseFloat((grouped.sad * 100).toFixed(1)) },
-            { emotion: 'angry', probability: parseFloat((grouped.angry * 100).toFixed(1)) },
-            { emotion: 'disgusted', probability: parseFloat((grouped.disgusted * 100).toFixed(1)) },
-            { emotion: 'fearful', probability: parseFloat((grouped.fearful * 100).toFixed(1)) }
+            { emotion: 'neutral', probability: parseFloat(((expressions.neutral || 0) * 100).toFixed(1)) },
+            { emotion: 'happy', probability: parseFloat(((expressions.happy || 0) * 100).toFixed(1)) },
+            { emotion: 'sad', probability: parseFloat(((expressions.sad || 0) * 100).toFixed(1)) },
+            { emotion: 'angry', probability: parseFloat(((expressions.angry || 0) * 100).toFixed(1)) },
+            { emotion: 'disgusted', probability: parseFloat(((expressions.disgusted || 0) * 100).toFixed(1)) },
+            { emotion: 'fearful', probability: parseFloat((((expressions.fearful || 0) + (expressions.surprised || 0)) * 100).toFixed(1)) }
           ];
 
           // END TIMING (Comment out if not testing)
           performanceMonitor.current.end(true);
-          
+
           // Immediate logging for testing (Comment out if not testing)
           const processingTime = performance.now() - frameStartTime;
           console.log(`Frame processed in ${processingTime.toFixed(0)}ms - SUCCESS`);
 
-          // Adaptive frame skipping for performance consistency
-           if (detectionTime > 200) { // If detection takes too long
-             frameSkipCount++;
-           } else {
-             frameSkipCount = 0; // Reset counter if performance is good
-           }
-        
-          // Debounced state update to reduce re-renders
-          if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current);
-          }
-          updateTimeoutRef.current = setTimeout(() => {
-            setCurrentEmotions(allEmotions);
-          }, 50); // 50ms debounce
+          // Update the component state with the latest emotions array.
+          setCurrentEmotions(allEmotions);
         } else {
-          // Only process after 3 consecutive no-face frames
           noFaceCount++;
+
+          // Only after 3 consecutive frames with no face, we consider the face gone.
           if (noFaceCount >= 3) {
-            // Clear canvas when no face is detected for 3+ frames
-            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            // Clear only the last known face region instead of entire canvas.
+            if (lastFaceRegion) {
+              ctx.clearRect(lastFaceRegion.x, lastFaceRegion.y, lastFaceRegion.width, lastFaceRegion.height);
+              lastFaceRegion = null;
+            }
 
             // END TIMING (Comment out if not testing)
             performanceMonitor.current.end(false);
 
+            // Reset emotions.
             setCurrentEmotions([]);
-            noFaceCount = 0; // Reset counter after clearing
           }
           // If noFaceCount < 3, keep previous face detection visible
         }
       } catch (error) {
-        // Handle any errors that might occur during face detection
+        // Log error and reset emotions.
         console.warn('Face detection error:', error);
         setCurrentEmotions([]);
       }
-    }, 300);
+
+      lastProcessTime = timestamp;
+      animationFrameId = requestAnimationFrame(processFrame);
+    };
+
+    // Start the animation frame loop
+    animationFrameId = requestAnimationFrame(processFrame);
 
     return () => {
-      clearInterval(intervalId);
-
-      // Clean up debounced updates
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
       }
 
       // Clean up video stream when component unmounts
@@ -227,7 +228,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
         URL.revokeObjectURL(videoRef.current.src);
       }
     };
-  }, [loading, videoFile]);
+  }, [modelsLoaded, videoFile]);
 
   // Send emotions to parent
   useEffect(() => {
@@ -246,17 +247,17 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
       <div className="video-wrapper">
         <video
           ref={videoRef}
-          autoPlay={true} // Auto-play for both webcam and video files
+          autoPlay
           muted
           playsInline
-          width="1280"
-          height="720"
+          width="960"
+          height="540"
           style={{ width: '640px', height: '360px' }}
         />
         <canvas
           ref={canvasRef}
-          width="1280"
-          height="720"
+          width="960"
+          height="540"
           className="overlay-canvas"
           style={{ width: '640px', height: '360px', position: 'absolute', top: 0, left: 0 }}
         />
