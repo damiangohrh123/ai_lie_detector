@@ -50,6 +50,7 @@ MANIFEST
 venv/
 env/
 ENV/
+.venv/
 
 # Model files (now using Hugging Face Hub)
 server/models/distilbert-deception/

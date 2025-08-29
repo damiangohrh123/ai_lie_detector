@@ -1,0 +1,46 @@
+model,audio,transcript,latency_s
+vosk,f1.wav,i arrive at the office at my club,1.149829387664795
+vosk,f2.wav,the winner's getting hotter everyday,1.1634488105773926
+vosk,f3.wav,artificial intelligence is changing the future very quickly,1.474095344543457
+vosk,n1.wav,i arrived at the office,0.9049577713012695
+vosk,n2.wav,the when is get the want to everyday,1.5312414169311523
+vosk,n3.wav,artificial intelligence is using a feature very quickly,1.6873164176940918
+vosk,q1.wav,i arrived at the office at nine o'clock,1.094454050064087
+vosk,q2.wav,the when it's get the hotter every day,1.0781738758087158
+vosk,q3.wav,artificial intelligence is changing the future very quickly,1.5460593700408936
+hf_wav2vec2,f1.wav,I ARRIVED AT THE OFFICE AT NINE O'CLOCK,0.3835184574127197
+hf_wav2vec2,f2.wav,THE WEDERS GETTING HOTTER EVERY DAY,0.31951451301574707
+hf_wav2vec2,f3.wav,ARTIFICIAL INTELLIGENCE IS CHANGING THE FUTURE VERY QUICKLY,0.374906063079834
+hf_wav2vec2,n1.wav,WHEN I ARRIVED AT THE BOVIT AT HAIOHAK WAL,0.4216592311859131
+hf_wav2vec2,n2.wav,THE WENT IN GETTING OTEVRYNAY,0.4068796634674072
+hf_wav2vec2,n3.wav,NOT IF HE CIAL ITALLIGES ES ATING THE FUSER VERY QUICKLY,0.531282901763916
+hf_wav2vec2,q1.wav,I ARRIVED AT THE OFFICE AT NINE O'CLOCK,0.45244312286376953
+hf_wav2vec2,q2.wav,THE WEATER IS GETTIN HOTTER EVERY DAY,0.39035582542419434
+hf_wav2vec2,q3.wav,ARTIFICIO INTALIGES IS CHANGING THE FUTURE VERY QUICKLY,0.4588029384613037
+whisper_tiny,f1.wav,I arrive at the office at Nail Club.,0.804126501083374
+whisper_tiny,f2.wav,The winners get the hard to every day.,0.46028971672058105
+whisper_tiny,f3.wav,Artificial intelligence is changing the future very quickly.,0.48450422286987305
+whisper_tiny,n1.wav,All right! méth Pic-alelu!,2.8282525539398193
+whisper_tiny,n2.wav,The wedding is getting hotter every day.,0.4606897830963135
+whisper_tiny,n3.wav,Artificial intelligence is treating the future very quickly.,0.46040821075439453
+whisper_tiny,q1.wav,I arrived at the office at Nio clock.,0.48475170135498047
+whisper_tiny,q2.wav,The weather is getting hotter every day.,0.4378621578216553
+whisper_tiny,q3.wav,Artificial intelligence is changing the future very quickly.,0.4845011234283447
+whisper_base,f1.wav,I arrive at the office at 9 o'clock.,0.9693148136138916
+whisper_base,f2.wav,The weather is getting hotter every day.,0.9213604927062988
+whisper_base,f3.wav,Artificial intelligence is changing the future very quickly.,0.9376778602600098
+whisper_base,n1.wav,I arrived at the office at Ryokun.,0.9528131484985352
+whisper_base,n2.wav,The weather is getting hotter every day.,0.8758528232574463
+whisper_base,n3.wav,Artificial intelligence is treating the future very quickly.,0.9840381145477295
+whisper_base,q1.wav,I arrived at the office at 9 o'clock.,0.937553882598877
+whisper_base,q2.wav,The weather is getting hotter every day.,0.8901560306549072
+whisper_base,q3.wav,Artificial intelligence is changing the future very quickly.,0.9691665172576904
+whisper_small,f1.wav,I arrive at the office at 9 o'clock.,2.9892756938934326
+whisper_small,f2.wav,The weather is getting hotter every day.,2.8431830406188965
+whisper_small,f3.wav,Artificial intelligence is changing the future very quickly.,2.950700521469116
+whisper_small,n1.wav,I arrived at the office at Iowlof.,3.017507553100586
+whisper_small,n2.wav,The weather is getting hotter every day.,2.7497875690460205
+whisper_small,n3.wav,Artificial intelligence is changing the future very quickly.,2.921957492828369
+whisper_small,q1.wav,I arrived at the office at 9 o'clock,2.9921767711639404
+whisper_small,q2.wav,The weather is getting hotter every day,2.98844838142395
+whisper_small,q3.wav,Artificial intelligence is changing the future very quickly.,2.972132444381714
