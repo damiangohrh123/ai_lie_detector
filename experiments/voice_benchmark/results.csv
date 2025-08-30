@@ -1,0 +1,13 @@
+model,audio,predicted_label,confidence,latency_s
+superb/wav2vec2-base-superb-er,angry.wav,ang,0.9997802376747131,0.7022194862365723
+superb/wav2vec2-base-superb-er,happy.wav,ang,0.9724215269088745,0.4239158630371094
+superb/wav2vec2-base-superb-er,neutral.wav,ang,0.9411882758140564,0.439556360244751
+superb/wav2vec2-base-superb-er,sad.wav,ang,0.5542263388633728,0.4394519329071045
+superb/wav2vec2-large-superb-er,angry.wav,ang,0.5922350287437439,1.467252254486084
+superb/wav2vec2-large-superb-er,happy.wav,ang,0.4788665473461151,1.1955831050872803
+superb/wav2vec2-large-superb-er,neutral.wav,neu,0.6065915822982788,1.0664646625518799
+superb/wav2vec2-large-superb-er,sad.wav,neu,0.6893887519836426,1.3294894695281982
+superb/hubert-large-superb-er,angry.wav,ang,0.8655095100402832,1.4159419536590576
+superb/hubert-large-superb-er,happy.wav,neu,0.3898743987083435,1.1330838203430176
+superb/hubert-large-superb-er,neutral.wav,neu,0.4715803563594818,1.185246229171753
+superb/hubert-large-superb-er,sad.wav,sad,0.46789804100990295,1.2672040462493896
