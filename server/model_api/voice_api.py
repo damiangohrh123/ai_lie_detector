@@ -8,12 +8,7 @@ import numpy as np
 import httpx    
 import time
 import logging
-
-# Import Wav2Vec2 model
-from transformers import (
-    Wav2Vec2ForSequenceClassification,
-    Wav2Vec2FeatureExtractor
-)
+from transformers import pipeline
 
 # Import Vosk
 from vosk import Model as VoskModel, KaldiRecognizer
@@ -29,13 +24,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Load Wav2Vec2 model once on startup
-emotion_model = Wav2Vec2ForSequenceClassification.from_pretrained("superb/wav2vec2-base-superb-er")
-emotion_processor = Wav2Vec2FeatureExtractor.from_pretrained("superb/wav2vec2-base-superb-er")
-emotion_model.eval()
+# Load HuBERT SUPERB model once on startup
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+use_device = 0 if (device.type == 'cuda') else -1
+emotion_pipe = pipeline("audio-classification", model="superb/hubert-large-superb-er", device=use_device)
 
 # Load Vosk model once on startup
-vosk_model = VoskModel("models/vosk-model-small-en-us-0.15")
+vosk_model = VoskModel("models/vosk-model-small-en-us-0.15") 
 
 emotion_labels = ["ang", "hap", "neu", "sad"]
 
@@ -97,42 +92,35 @@ def audio_preprocessing(audio_data, sample_rate):
         # Return original audio data on error
         return audio_data
 
-def analyze_emotion(audio_tensor, sr):
+def analyze_emotion(audio_tensor_or_array, sr):
     start_time = time.time()
-    
-    # Ensure audio is in the right format for the model
-    if audio_tensor.dtype != torch.float32:
-        audio_tensor = audio_tensor.float()
-    
-    # Ensure proper normalization to [-1, 1] range
-    if torch.max(torch.abs(audio_tensor)) > 0:
-        audio_tensor = audio_tensor / torch.max(torch.abs(audio_tensor))
-    
-    # Ensure correct shape for the model
-    if len(audio_tensor.shape) == 1:
-        audio_tensor = audio_tensor.unsqueeze(0)
-    
-    # Convert to numpy for the processor
-    audio_numpy = audio_tensor.squeeze().numpy()
-    
-    # Process audio
+
+    # Accept torch tensor or numpy array
+    if isinstance(audio_tensor_or_array, torch.Tensor):
+        audio_numpy = audio_tensor_or_array.squeeze().cpu().numpy()
+    else:
+        audio_numpy = np.asarray(audio_tensor_or_array).squeeze()
+
+    # Normalize to [-1, 1]
+    if np.max(np.abs(audio_numpy)) > 0:
+        audio_numpy = audio_numpy / np.max(np.abs(audio_numpy))
+
     try:
-        inputs = emotion_processor(audio_numpy, sampling_rate=sr, return_tensors="pt", padding=True)
-        
-        with torch.no_grad():
-            logits = emotion_model(**inputs).logits
-        
-        probs = torch.nn.functional.softmax(logits[0], dim=-1)
-        
+        preds = emotion_pipe({"array": audio_numpy, "sampling_rate": sr}, top_k=len(emotion_labels))
         emotion_time = time.time() - start_time
-        
-        # Returns a dictionary. E.g. { "ang": 0.02, "hap": 0.87, "neu": 0.05, "sad": 0.06 }
-        return {label: round(float(probs[i]), 4) for i, label in enumerate(emotion_labels)}, emotion_time
-        
+
+        # preds is a list of {'label': 'ang', 'score': 0.9}
+        scores = {label: 0.0 for label in emotion_labels}
+        for p in preds:
+            lbl = p.get("label")
+            sc = float(p.get("score", 0.0))
+            if lbl in scores:
+                scores[lbl] = round(sc, 4)
+
+        return scores, emotion_time
     except Exception as e:
         logger.error(f"Emotion detection error: {e}")
-        # Return neutral as fallback
-        return {label: 0.0 if label != "neu" else 1.0 for label in emotion_labels}
+        return {label: 0.0 if label != "neu" else 1.0 for label in emotion_labels}, 0.0
 
 def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
     # Creates a VAD object
