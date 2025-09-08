@@ -144,20 +144,6 @@ export default function FileUploadPage() {
           </div>
         )}
 
-        {/* Fusion Truthfulness Component */}
-        {uploadedFile ? (
-          <section className="fusion-section">
-            <h2 className="section-label">✅ Truthfulness Fusion</h2>
-            <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
-          </section>
-        ) : (
-          <section className="fusion-section">
-            <h2 className="section-label">✅ Truthfulness Fusion</h2>
-            <div className="upload-analysis-placeholder-text">
-              Upload a video file to analyze overall truthfulness across all modalities.
-            </div>
-          </section>
-        )}
       </div>
 
       {/* Voice and face analysis section */}
@@ -205,12 +191,17 @@ export default function FileUploadPage() {
 
       {/* Truthfulness Timeline */}
       <div className="third-pane">
-        <h2 className="section-label">📈 Deception Timeline</h2>
+        <h2 className="section-label">📈 Overall Truthfulness</h2>
         {uploadedFile ? (
-          <DeceptionTimeline timeline={deceptionTimeline} />
+          <>
+            <div className="third-pane-content">
+              <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
+              <DeceptionTimeline timeline={deceptionTimeline} currentScore={fusionScore} />
+            </div>
+          </>
         ) : (
           <div className="upload-analysis-placeholder-text">
-            Upload a video file to see deception patterns over time.
+            Upload a video file to see truthfulness patterns over time.
           </div>
         )}
       </div>

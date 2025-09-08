@@ -12,7 +12,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
   const dimsRef = useRef(null);
 
   // Performance monitoring (Comment out if not testing)
-  const performanceMonitor = useRef(new PerformanceMonitor('FaceDetection'));
+  //const performanceMonitor = useRef(new PerformanceMonitor('FaceDetection'));
 
   useEffect(() => {
     async function loadModels() {
@@ -122,8 +122,8 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
 
       try {
         // START TIMING - Frame analysis begins (Comment out if not testing)
-        const frameStartTime = performance.now();
-        performanceMonitor.current.start();
+        //const frameStartTime = performance.now();
+        //performanceMonitor.current.start();
 
         // Detect face and expressions. tinyOptions specifies detector variables. withFaceExpressions returns probabilities for emotions.
         const result = await faceapi.detectSingleFace(videoRef.current, tinyOptions).withFaceExpressions();
@@ -173,11 +173,11 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
           ];
 
           // END TIMING (Comment out if not testing)
-          performanceMonitor.current.end(true);
+          //performanceMonitor.current.end(true);
 
           // Immediate logging for testing (Comment out if not testing)
-          const processingTime = performance.now() - frameStartTime;
-          console.log(`Frame processed in ${processingTime.toFixed(0)}ms - SUCCESS`);
+          //const processingTime = performance.now() - frameStartTime;
+          //console.log(`Frame processed in ${processingTime.toFixed(0)}ms - SUCCESS`);
 
           // Update the component state with the latest emotions array.
           setCurrentEmotions(allEmotions);
@@ -193,7 +193,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
             }
 
             // END TIMING (Comment out if not testing)
-            performanceMonitor.current.end(false);
+            //performanceMonitor.current.end(false);
 
             // Reset emotions.
             setCurrentEmotions([]);

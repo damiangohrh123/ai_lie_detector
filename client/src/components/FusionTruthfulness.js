@@ -51,7 +51,10 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
         .then(res => res.json())
         .then(data => {
           setResult(data);
-          if (setFusionScore && typeof data.score === 'number') setFusionScore(data.score);
+          if (setFusionScore && typeof data.score === 'number') {
+            const truthScore = 1 - data.score;
+            setFusionScore(truthScore);
+          }
         })
         .catch(e => {
           setError('Failed to fetch fusion score');
@@ -64,27 +67,37 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
   const truthScore = result ? 1 - result.score : null;
   const percent = truthScore !== null ? (truthScore * 100).toFixed(1) : null;
   const confidenceLabel = truthScore !== null ? getConfidenceLabel(result.score) : '';
-  const barColor = truthScore > 0.5 ? '#22c55e' : (truthScore > 0.2 ? '#e69c14ff' : '#ef4444');
+  const barColor = truthScore !== null ? (truthScore > 0.5 ? '#22c55e' : (truthScore > 0.2 ? '#e69c14' : '#ef4444')) : '#9ca3af';
+
+  const modalities = [
+    { name: 'Voice', color: '#3b82f6' },
+    { name: 'Face', color: '#a78bfa' },
+    { name: 'Speech', color: '#22c55e' }
+  ];
 
   return (
-    <div>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
+    <div className="fusion-card">
+      {error && <div className="fusion-error">{error}</div>}
       {result && (
         <>
-          <div style={{ fontSize: 56, fontWeight: 700, color: barColor, marginBottom: 8 }}>{percent}%</div>
-          <div style={{ fontSize: 18, color: barColor, marginBottom: 24 }}>{confidenceLabel}</div>
-          <div className="truth-score-bar-background">
-            <div style={{
-              width: `${truthScore * 100}%`,
-              height: '100%',
-              background: barColor,
-              borderRadius: 6,
-              transition: 'width 0.5s'
-            }} />
+          <div className="fusion-percent" style={{ color: barColor }}>{percent}%</div>
+          <div className="fusion-confidence" style={{ color: barColor }}>{confidenceLabel}</div>
+
+          <div className="truth-score-bar-background" style={{ marginTop: 18 }}>
+            <div className="truth-score-fill" style={{ width: `${truthScore * 100}%`, background: barColor }} />
           </div>
-          <div style={{ fontSize: 14, color: '#666', marginTop: 8 }}>
-            0% = Highly Deceptive | 100% = Completely Truthful
+
+          <div className="fusion-modality-list">
+            {modalities.map(m => (
+              <div key={m.name} className="modality-pill">
+                <span className="modality-dot" style={{ background: m.color }} />
+                <span className="modality-name">{m.name}</span>
+                <span className="modality-status">Contributing</span>
+              </div>
+            ))}
           </div>
+
+          <div className="fusion-footer">0% = Highly Deceptive &nbsp;|&nbsp; 100% = Completely Truthful</div>
         </>
       )}
     </div>

@@ -85,12 +85,6 @@ export default function WebcamPage() {
         <div style={{ position: 'relative' }}>
           <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
         </div>
-
-        {/* Fusion Truthfulness Component */}
-        <section className="fusion-section">
-          <h2 className="section-label">✅ Truthfulness Fusion</h2>
-          <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
-        </section>
       </div>
 
       {/* Voice and face analysis section */}
@@ -115,10 +109,13 @@ export default function WebcamPage() {
         </section>
       </div>
 
-      {/* Deception Timeline section */}
+      {/* Truthfulness Timeline section */}
       <div className="third-pane">
-        <h2 className="section-label">📈 Deception Timeline</h2>
-        <DeceptionTimeline timeline={deceptionTimeline} />
+        <h2 className="section-label">📈 Overall Truthfulness</h2>
+        <div className="third-pane-content">
+          <FusionTruthfulness face={faceVec || [0, 0]} voice={voiceVec || [0, 0]} text={textVec || [0, 0]} setFusionScore={setFusionScore} />
+          <DeceptionTimeline timeline={deceptionTimeline} currentScore={fusionScore} />
+        </div>
       </div>
     </div>
   );
