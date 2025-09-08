@@ -105,8 +105,8 @@ export default function FileUploadPage() {
         {/* Upload New File Button - only show after a file has been uploaded */}
         {uploadedFile && (
           <div style={{ marginBottom: 16 }}>
-            <button 
-              onClick={handleNewUpload} 
+            <button
+              onClick={handleNewUpload}
               style={{
                 background: '#3b82f6',
                 color: 'white',
@@ -136,8 +136,8 @@ export default function FileUploadPage() {
         {/* Video area - only show when file is uploaded */}
         {uploadedFile && (
           <div style={{ position: 'relative' }}>
-            <FaceExpressionDetector 
-              onEmotionsUpdate={setFaceEmotions} 
+            <FaceExpressionDetector
+              onEmotionsUpdate={setFaceEmotions}
               videoFile={uploadedFile}
               onVideoRef={setVideoRef}
             />
@@ -166,11 +166,11 @@ export default function FileUploadPage() {
           <>
             <section className="voice-section">
               <h2 className="section-label">👄 Voice Analysis</h2>
-              <AudioProcessor 
+              <AudioProcessor
                 mode="video"
                 videoFile={uploadedFile}
                 videoRef={videoRef}
-                setVoiceResults={setVoiceResults} 
+                setVoiceResults={setVoiceResults}
                 setTranscriptHistory={setTranscriptHistory}
               />
             </section>
@@ -196,23 +196,23 @@ export default function FileUploadPage() {
           </>
         )}
 
-        {/* Truthfulness Timeline */}
-        <section className="deception-timeline-section">
-          <h2 className="section-label">📈 Deception Timeline</h2>
-          {uploadedFile ? (
-            <DeceptionTimeline timeline={deceptionTimeline} />
-          ) : (
-            <div className="upload-analysis-placeholder-text">
-              Upload a video file to see deception patterns over time.
-            </div>
-          )}
+        {/* Text Analysis section */}
+        <section className="speech-pattern-section">
+          <h2 className="section-label">💬 Speech Pattern Analysis</h2>
+          <SpeechPatternPanel segments={transcriptHistory} />
         </section>
       </div>
 
-      {/* Text Analysis section */}
+      {/* Truthfulness Timeline */}
       <div className="third-pane">
-  <h2 className="section-label">💬 Speech Pattern Analysis</h2>
-  <SpeechPatternPanel segments={transcriptHistory} />
+        <h2 className="section-label">📈 Deception Timeline</h2>
+        {uploadedFile ? (
+          <DeceptionTimeline timeline={deceptionTimeline} />
+        ) : (
+          <div className="upload-analysis-placeholder-text">
+            Upload a video file to see deception patterns over time.
+          </div>
+        )}
       </div>
     </div>
   );

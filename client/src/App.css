@@ -92,6 +92,8 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
   gap: 20px;
   padding-top: 20px;
   padding-bottom: 20px;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .third-pane {
@@ -108,8 +110,8 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
 
 .section-label {
   color: var(--heading-text-color);
-  font-size: 22px;
-  font-weight: normal;
+  font-size: 18px;
+  font-weight: 500;
   padding: 0;
   margin: 0 0 20px 0;
 }
@@ -159,6 +161,16 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
 }
 
 .face-section {
+  display: flex;
+  min-height: 290px;
+  flex-direction: column;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: var(--outline-color) 2px solid;
+}
+
+.speech-pattern-section {
   display: flex;
   min-height: 290px;
   flex-direction: column;
@@ -257,7 +269,7 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
 
 
 
-.speech-panel { display: flex; flex-direction: column; gap: 12px; }
+.speech-panel { display: flex; flex-direction: column; gap: 12px;   flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 6px; }
 
 .speech-card {
   border-radius: 8px;
@@ -304,7 +316,7 @@ code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', mon
 .tab { padding: 8px 12px; border-radius: 8px; background: white; border: 1px solid var(--outline-color); cursor: pointer; }
 .tab.active { background: #f3f4f6; font-weight: 700; }
 
-.speech-list { margin-top: 8px; display:flex; flex-direction: column; gap: 12px; max-height: 420px; overflow-y: auto; }
+.speech-list { margin-top: 8px; display:flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .speech-item { border-radius: 8px; padding: 14px; border: 1px solid var(--outline-color); background: white; }
 .speech-item.item-high { background: #fff5f5; border-color: #fecaca; }
 .speech-item.item-med { background: #fffbeb; border-color: #fef3c7; }

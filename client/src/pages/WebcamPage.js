@@ -97,10 +97,10 @@ export default function WebcamPage() {
       <div className="second-pane">
         <section className="voice-section">
           <h2 className="section-label">👄 Voice Analysis</h2>
-          <AudioProcessor 
+          <AudioProcessor
             mode="live"
-            setVoiceResults={setVoiceResults} 
-            setTranscriptHistory={setTranscriptHistory} 
+            setVoiceResults={setVoiceResults}
+            setTranscriptHistory={setTranscriptHistory}
           />
         </section>
         <section className="face-section">
@@ -108,17 +108,17 @@ export default function WebcamPage() {
           <FaceAnalysisBars currentEmotions={faceEmotions} />
         </section>
 
-        {/* Truthfulness Timeline */}
-        <section className="deception-timeline-section">
-          <h2 className="section-label">📈 Deception Timeline</h2>
-          <DeceptionTimeline timeline={deceptionTimeline} />
+        {/* Speech Pattern Analysis */}
+        <section className="speech-pattern-section">
+          <h2 className="section-label">💬 Speech Pattern Analysis</h2>
+          <SpeechPatternPanel segments={transcriptHistory} />
         </section>
       </div>
 
-      {/* Speech Pattern Analysis section */}
+      {/* Deception Timeline section */}
       <div className="third-pane">
-        <h2 className="section-label">💬 Speech Pattern Analysis</h2>
-        <SpeechPatternPanel segments={transcriptHistory} />
+        <h2 className="section-label">📈 Deception Timeline</h2>
+        <DeceptionTimeline timeline={deceptionTimeline} />
       </div>
     </div>
   );
