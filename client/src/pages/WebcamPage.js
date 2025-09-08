@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import FaceExpressionDetector from '../components/FaceExpressionDetector';
 import AudioProcessor from '../components/AudioProcessor';
 import FaceAnalysisBars from '../components/FaceAnalysisBars';
-import TextAnalysis from '../components/TextAnalysis';
+import SpeechPatternPanel from '../components/SpeechPatternPanel';
 import FusionTruthfulness from '../components/FusionTruthfulness';
 import DeceptionTimeline from '../components/DeceptionTimeline';
 
@@ -115,10 +115,10 @@ export default function WebcamPage() {
         </section>
       </div>
 
-      {/* Text Analysis section */}
+      {/* Speech Pattern Analysis section */}
       <div className="third-pane">
         <h2 className="section-label">💬 Speech Pattern Analysis</h2>
-        <TextAnalysis transcript={transcript} segments={transcriptHistory} />
+        <SpeechPatternPanel segments={transcriptHistory} />
       </div>
     </div>
   );

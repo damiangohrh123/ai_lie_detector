@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import FaceExpressionDetector from '../components/FaceExpressionDetector';
 import AudioProcessor from '../components/AudioProcessor';
 import FaceAnalysisBars from '../components/FaceAnalysisBars';
-import TextAnalysis from '../components/TextAnalysis';
+import SpeechPatternPanel from '../components/SpeechPatternPanel';
 import FusionTruthfulness from '../components/FusionTruthfulness';
 import DeceptionTimeline from '../components/DeceptionTimeline';
 import FileUploader from '../components/FileUploader';
@@ -211,8 +211,8 @@ export default function FileUploadPage() {
 
       {/* Text Analysis section */}
       <div className="third-pane">
-        <h2 className="section-label">💬 Speech Pattern Analysis</h2>
-        <TextAnalysis transcript={transcript} segments={transcriptHistory} />
+  <h2 className="section-label">💬 Speech Pattern Analysis</h2>
+  <SpeechPatternPanel segments={transcriptHistory} />
       </div>
     </div>
   );

@@ -7,7 +7,17 @@
   --bar-background-color: #e5e7eb;
   --outline-color: #e5e7eb;
   --truth-green: #22c55e;
+  --truth-green-background: #70e099;
+  --truth-green-light: #edfff3;
+  --truth-green-text: #166534;
   --deceptive-red: #ef4444;
+  --deceptive-red-background: #fca5a1;
+  --deceptive-red-light: #fff3f3;
+  --deceptive-red-text: #991b1b;
+  --medium-orange: #f97316;
+  --medium-orange-background: #ffd59e;
+  --medium-orange-light: #fff4ec;
+  --medium-orange-text: #7e3f16;
 }
 
 html, body, #root {
@@ -32,10 +42,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
+code { font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace; }
 
 
 
@@ -246,23 +253,82 @@ code {
 
 
 
-.deception-timeline-container {
-  width: 100%;
-  height: 100%;
+.deception-timeline-container { width: 100%; height: 100%; }
+
+
+
+.speech-panel { display: flex; flex-direction: column; gap: 12px; }
+
+.speech-card {
+  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0,0,0,0.06);
+  display:flex; justify-content: space-between; align-items: center;
 }
 
+.speech-card-text { font-size: 14px; color: var(--text-color); font-weight: 500; max-width: 75%; }
+.speech-right-meta { display:flex; gap:8px; align-items: center; }
+.speech-pill { padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; }
+.speech-percent { font-weight: 500; font-size: 14px; }
+
+.item-low { background: var(--truth-green-light); border-color: #bbf7d0; }
+.item-low .speech-pill { background: var(--truth-green-background); color: var(--truth-green-text); }
+.item-low .speech-percent { color: var(--truth-green); }
+
+.item-med { background: var(--medium-orange-light); border-color: #fde68a; }
+.item-med .speech-pill { background: var(--medium-orange-background); color: var(--medium-orange-text); }
+.item-med .speech-percent { color: var(--medium-orange); }
+
+.item-high { background: var(--deceptive-red-light); border-color: #fecaca; }
+.item-high .speech-pill { background: var(--deceptive-red-background); color: var(--deceptive-red-text); }
+.item-high .speech-percent { color: var(--deceptive-red); }
 
 
 
-.no-transcript-placeholder {
-  color: var(--sub-text-color);
+
+.card {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 18px;
+  text-align: center;
+  border: 1px solid var(--outline-color);
+  font-weight: 700;
 }
 
-.transcript-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+.card-sub { font-weight: 500; font-size: 12px; color: var(--sub-text-color); margin-top: 6px; }
+.card-warn { background: #fff5f5; border-color: #fee2e2; }
+.card-blue { background: #f0f9ff; border-color: #bfdbfe; }
+
+.speech-tabs { display:flex; gap:8px; margin-top: 8px; }
+.tab { padding: 8px 12px; border-radius: 8px; background: white; border: 1px solid var(--outline-color); cursor: pointer; }
+.tab.active { background: #f3f4f6; font-weight: 700; }
+
+.speech-list { margin-top: 8px; display:flex; flex-direction: column; gap: 12px; max-height: 420px; overflow-y: auto; }
+.speech-item { border-radius: 8px; padding: 14px; border: 1px solid var(--outline-color); background: white; }
+.speech-item.item-high { background: #fff5f5; border-color: #fecaca; }
+.speech-item.item-med { background: #fffbeb; border-color: #fef3c7; }
+.speech-item.item-low { background: #ecfdf5; border-color: #bbf7d0; }
+
+.speech-item-header { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.speech-item-index { font-weight:700; color: #374151; }
+.speech-item-time { color: var(--sub-text-color); font-size: 13px; margin-left: 8px; }
+.speech-item-new { background: #e6f0ff; color: #1e3a8a; padding: 4px 8px; border-radius: 9999px; font-size: 12px; margin-left: auto; }
+
+.speech-item-body { font-size: 18px; font-weight: 600; color: var(--text-color); margin-bottom: 8px; }
+.speech-item-meta { display:flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.risk-pill { padding: 6px 10px; border-radius: 9999px; font-weight: 700; font-size: 12px; color: white; background: #ef4444; }
+.item-high .risk-pill { background: #ef4444; }
+.item-med .risk-pill { background: #f59e0b; }
+.item-low .risk-pill { background: #22c55e; }
+.risk-percent { font-weight: 800; font-size: 18px; color: #1f2937; }
+.confidence { color: var(--sub-text-color); font-size: 13px; }
+
+.item-progress-track { height: 8px; background: rgba(0,0,0,0.06); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+.item-progress-fill { height: 100%; background: linear-gradient(90deg,#ef4444,#f59e0b); }
+
+.speech-item-tags { display:flex; gap:8px; margin-top:6px; }
+.tag { background: #fff7ed; color: #92400e; padding: 6px 8px; border-radius: 9999px; font-size: 12px; }
 
 .transcript-container {
   position: relative;
