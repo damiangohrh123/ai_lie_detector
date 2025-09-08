@@ -30,6 +30,9 @@ export default function AudioProcessor({
   const workletNodeRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const transcriptBufferRef = useRef([]);
+  const flushTimeoutRef = useRef(null);
+  const MAX_SEGMENTS = 50;
 
   // WebSocket connection
   const connectWebSocket = () => {
@@ -79,14 +82,42 @@ export default function AudioProcessor({
 
         // Only process final text segments for transcript
         if (data.type === "text_sentiment" && data.text && data.text.trim()) {
+          // Skip single-word transcripts
+          const textTrim = data.text.trim();
+          const wordCount = textTrim.split(/\s+/).filter(Boolean).length;
+          if (wordCount <= 1) {
+            // Do not add to results or transcript buffer
+            return;
+          }
+          // Keep last 3 results for fusion
           setResults(prev => {
             const newResults = [...prev, data];
-            return newResults.slice(-3); // Keep last 3 results for fusion
+            return newResults.slice(-3);
           });
-          setTranscriptHistoryState(prev => {
-            const newHistory = [...prev, data];
-            return newHistory; // Keep all transcript entries
-          });
+
+          // Precompute segment fields to keep render cheap
+          const seg = {
+            text: data.text,
+            label: data.label,
+            score: typeof data.score === 'number' ? data.score : 0,
+            start: Date.now(),
+            // timeLabel precomputed to avoid Date formatting in render
+            timeLabel: new Date().toLocaleTimeString(),
+            tags: data.tags || []
+          };
+
+          // Buffer the segment and flush in a short batch to reduce re-renders
+          transcriptBufferRef.current.push(seg);
+          if (!flushTimeoutRef.current) {
+            flushTimeoutRef.current = setTimeout(() => {
+              const buffer = transcriptBufferRef.current.splice(0);
+              flushTimeoutRef.current = null;
+              setTranscriptHistoryState(prev => {
+                const next = [...prev, ...buffer];
+                return next.slice(-MAX_SEGMENTS);
+              });
+            }, 250); // 250ms batch window
+          }
         }
 
         // Handle voice sentiment for emotion bars
@@ -220,6 +251,10 @@ export default function AudioProcessor({
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
+      }
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
       }
       if (sourceNodeRef.current) {
         sourceNodeRef.current.disconnect();
