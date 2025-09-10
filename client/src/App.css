@@ -49,6 +49,25 @@ body {
   gap: 12px;
 }
 
+.mode-separator {
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--outline-color);
+}
+
+.nav-export-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 12px;
+  background: #10b981;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+
 
 
 
@@ -71,7 +90,7 @@ body {
   min-width: 664px;
   flex-direction: column;
   gap: 20px;
-  padding: 20px 0 0 20px;
+  padding: 90px 0 0 20px;
 }
 
 .second-pane {
@@ -428,3 +447,14 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+.export-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.export-btn:disabled { opacity: 0.6; cursor: default; }

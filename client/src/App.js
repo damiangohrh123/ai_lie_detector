@@ -30,7 +30,7 @@ function Navigation() {
           })
         }}
       >
-        📹 Webcam
+        Webcam
       </Link>
 
       <Link
@@ -54,8 +54,22 @@ function Navigation() {
           })
         }}
       >
-        📁 Upload
+        Upload
       </Link>
+        <div className="mode-separator">
+          <button
+            onClick={() => {
+              if (window.__exportSession && typeof window.__exportSession === 'function') {
+                window.__exportSession();
+              } else {
+                alert('Export not available on this page');
+              }
+            }}
+            className="nav-export-btn"
+          >
+            Export Summary
+          </button>
+        </div>
     </nav>
   );
 }

@@ -16,6 +16,7 @@ export default function FileUploadPage() {
   const [deceptionTimeline, setDeceptionTimeline] = useState([]);
   const [fusionScore, setFusionScore] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   // Use transcriptHistory for display
   const transcript = transcriptHistory.map(r => r.text).join(' ');
@@ -99,27 +100,89 @@ export default function FileUploadPage() {
     setFusionScore(null);
   };
 
+  async function exportSession() {
+    try {
+      setExporting(true);
+
+      const payload = {
+        session_id: `upload-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        fusion_score: fusionScore,
+        modalities: {
+          face: (faceVec && faceVec.length > 1) ? faceVec[1] : null,
+          voice: (voiceVec && voiceVec.length > 1) ? voiceVec[1] : null,
+          text: (textVec && textVec.length > 1) ? textVec[1] : null
+        },
+        timeline: deceptionTimeline,
+        transcript: transcriptHistory,
+        top_moments: [],
+        // include uploaded file info if available
+        video_name: uploadedFile?.name || uploadedFile?.fileName || null
+      };
+
+      const resp = await fetch('http://localhost:8000/api/export-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (resp.ok && contentType.includes('application/pdf')) {
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_summary-${payload.session_id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        let bodyText = await resp.text();
+        try {
+          const j = JSON.parse(bodyText);
+          alert('Export failed: ' + (j.detail || j.error || JSON.stringify(j)));
+        } catch (e) {
+          alert('Export failed: ' + bodyText);
+        }
+      }
+    } catch (e) {
+      console.error('Export error', e);
+      alert('Export failed: ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // Expose exporter to top-level navigation button
+  useEffect(() => {
+    window.__exportSession = exportSession;
+    return () => { delete window.__exportSession; };
+  }, [exportSession]);
+
   return (
     <div className="app-layout">
       <div className="first-pane">
         {/* Upload New File Button - only show after a file has been uploaded */}
         {uploadedFile && (
           <div style={{ marginBottom: 16 }}>
-            <button
-              onClick={handleNewUpload}
-              style={{
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 500
-              }}
-            >
-              📁 Upload New File
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleNewUpload}
+                style={{
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500
+                }}
+              >
+                📁 Upload New File
+              </button>
+            </div>
           </div>
         )}
 
@@ -143,7 +206,6 @@ export default function FileUploadPage() {
             />
           </div>
         )}
-
       </div>
 
       {/* Voice and face analysis section */}

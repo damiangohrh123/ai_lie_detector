@@ -78,6 +78,69 @@ export default function WebcamPage() {
     }
   }, [fusionScore]);
 
+  const [exporting, setExporting] = useState(false);
+
+  async function exportSession() {
+    try {
+      setExporting(true);
+
+      // Build payload from current state
+      const payload = {
+        session_id: `webcam-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        fusion_score: fusionScore,
+        modalities: {
+          // server template expects a simple numeric score per modality (use deceptive score at index 1)
+          face: (faceVec && faceVec.length > 1) ? faceVec[1] : null,
+          voice: (voiceVec && voiceVec.length > 1) ? voiceVec[1] : null,
+          text: (textVec && textVec.length > 1) ? textVec[1] : null
+        },
+        timeline: deceptionTimeline,
+        transcript: transcriptHistory,
+        top_moments: []
+      };
+
+      const resp = await fetch('http://localhost:8000/api/export-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const contentType = resp.headers.get('content-type') || '';
+      if (resp.ok && contentType.includes('application/pdf')) {
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_summary-${payload.session_id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        // Try to parse JSON error
+        let bodyText = await resp.text();
+        try {
+          const j = JSON.parse(bodyText);
+          alert('Export failed: ' + (j.detail || j.error || JSON.stringify(j)));
+        } catch (e) {
+          alert('Export failed: ' + bodyText);
+        }
+      }
+    } catch (e) {
+      console.error('Export error', e);
+      alert('Export failed: ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  // Expose exporter to top-level navigation button
+  useEffect(() => {
+    window.__exportSession = exportSession;
+    return () => { delete window.__exportSession; };
+  }, [exportSession]);
+
   return (
     <div className="app-layout">
       <div className="first-pane">
