@@ -6,6 +6,7 @@ import SpeechPatternPanel from '../components/SpeechPatternPanel';
 import FusionTruthfulness from '../components/FusionTruthfulness';
 import DeceptionTimeline from '../components/DeceptionTimeline';
 import FileUploader from '../components/FileUploader';
+import { captureThumbnail, timelineToPNG, computeTopMoments, captureSnippetAtMs, computeAvgFusion } from '../utils/exportHelpers';
 
 export default function FileUploadPage() {
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -17,9 +18,6 @@ export default function FileUploadPage() {
   const [fusionScore, setFusionScore] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
   const [exporting, setExporting] = useState(false);
-
-  // Use transcriptHistory for display
-  const transcript = transcriptHistory.map(r => r.text).join(' ');
 
   // Get latest [truth, lie] for face modality
   let faceVec = undefined;
@@ -104,27 +102,48 @@ export default function FileUploadPage() {
     try {
       setExporting(true);
 
+      const thumbnail = captureThumbnail(videoRef);
+      const timeline_png = timelineToPNG(deceptionTimeline);
+      let top_moments = computeTopMoments(deceptionTimeline, transcriptHistory, 5);
+
+      // Capture a small snippet image for each top moment
+      try {
+        for (let i = 0; i < top_moments.length; i++) {
+          const tm = top_moments[i];
+          if (tm && tm.time_ms) {
+            // eslint-disable-next-line no-await-in-loop
+            tm.video_snippet = await captureSnippetAtMs(videoRef, tm.time_ms, deceptionTimeline);
+          } else {
+            tm.video_snippet = null;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to capture some top moment snippets', e);
+      }
+
+      // Compute average fusion score
+      const avgFusion = computeAvgFusion(deceptionTimeline, fusionScore);
+
       const payload = {
         session_id: `upload-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        fusion_score: fusionScore,
-        modalities: {
-          face: (faceVec && faceVec.length > 1) ? faceVec[1] : null,
-          voice: (voiceVec && voiceVec.length > 1) ? voiceVec[1] : null,
-          text: (textVec && textVec.length > 1) ? textVec[1] : null
-        },
+        fusion_score: avgFusion,
         timeline: deceptionTimeline,
         transcript: transcriptHistory,
-        top_moments: [],
+        top_moments: top_moments,
         // include uploaded file info if available
-        video_name: uploadedFile?.name || uploadedFile?.fileName || null
+        video_name: uploadedFile?.name || uploadedFile?.fileName || null,
+        thumbnail_url: thumbnail,
+        timeline_png: timeline_png,
+        video_url: null
       };
 
-      const resp = await fetch('http://localhost:8000/api/export-summary', {
+      const respPromise = fetch('http://localhost:8000/api/export-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      const resp = await respPromise;
 
       const contentType = resp.headers.get('content-type') || '';
       if (resp.ok && contentType.includes('application/pdf')) {
@@ -137,6 +156,15 @@ export default function FileUploadPage() {
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
+        // Clear transient analysis data after successful export
+        try { setTranscriptHistory([]); } catch (e) { }
+        try { setVoiceResults([]); } catch (e) { }
+        try { setFaceEmotions([]); } catch (e) { }
+        try { setDeceptionTimeline([]); } catch (e) { }
+        try { setFusionScore(null); } catch (e) { }
+
+        // Also clear internal buffers in AudioProcessor
+        try { if (window && window.__clearAudioTranscripts) { window.__clearAudioTranscripts(); } } catch (e) { }
       } else {
         let bodyText = await resp.text();
         try {
@@ -146,6 +174,7 @@ export default function FileUploadPage() {
           alert('Export failed: ' + bodyText);
         }
       }
+      return resp;
     } catch (e) {
       console.error('Export error', e);
       alert('Export failed: ' + e.message);
@@ -154,11 +183,14 @@ export default function FileUploadPage() {
     }
   }
 
-  // Expose exporter to top-level navigation button
+  // Expose exporter to top-level navigation button via a stable wrapper so
+  // the effect doesn't re-run every render (exportSession is recreated each render).
+  const exportRef = useRef(null);
+  exportRef.current = exportSession;
   useEffect(() => {
-    window.__exportSession = exportSession;
+    window.__exportSession = (...args) => exportRef.current && exportRef.current(...args);
     return () => { delete window.__exportSession; };
-  }, [exportSession]);
+  }, []);
 
   return (
     <div className="app-layout">
@@ -269,4 +301,4 @@ export default function FileUploadPage() {
       </div>
     </div>
   );
-} 
+}

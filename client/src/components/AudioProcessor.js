@@ -286,6 +286,22 @@ export default function AudioProcessor({
     if (setTranscriptHistory) setTranscriptHistory(transcriptHistory);
   }, [transcriptHistory, setTranscriptHistory]);
 
+  // Expose a global clear hook so parent pages can wipe internal buffers after export
+  useEffect(() => {
+    const clearFn = () => {
+      try {
+        transcriptBufferRef.current = [];
+        if (flushTimeoutRef.current) { clearTimeout(flushTimeoutRef.current); flushTimeoutRef.current = null; }
+        setTranscriptHistoryState([]);
+        setResults([]);
+        setVoiceEmotionHistory([]);
+      } catch (e) { /* ignore */ }
+    };
+    // Attach to window for quick integration
+    try { window.__clearAudioTranscripts = clearFn; } catch (e) {}
+    return () => { try { if (window.__clearAudioTranscripts === clearFn) delete window.__clearAudioTranscripts; } catch (e) {} };
+  }, []);
+
   // Clean up old emotions periodically to reset bars when no recent sentiments
   useEffect(() => {
     const cleanupInterval = setInterval(() => {

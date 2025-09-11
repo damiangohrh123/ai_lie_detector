@@ -5,6 +5,7 @@ import FaceAnalysisBars from '../components/FaceAnalysisBars';
 import SpeechPatternPanel from '../components/SpeechPatternPanel';
 import FusionTruthfulness from '../components/FusionTruthfulness';
 import DeceptionTimeline from '../components/DeceptionTimeline';
+import { captureThumbnail, timelineToPNG, computeTopMoments, captureSnippetAtMs, computeAvgFusion } from '../utils/exportHelpers';
 
 export default function WebcamPage() {
   const [faceEmotions, setFaceEmotions] = useState([]);
@@ -12,6 +13,7 @@ export default function WebcamPage() {
   const [transcriptHistory, setTranscriptHistory] = useState([]);
   const [deceptionTimeline, setDeceptionTimeline] = useState([]);
   const [fusionScore, setFusionScore] = useState(null);
+  const [videoRef, setVideoRef] = useState(null);
 
   // Use transcriptHistory for display
   const transcript = transcriptHistory.map(r => r.text).join(' ');
@@ -83,28 +85,48 @@ export default function WebcamPage() {
   async function exportSession() {
     try {
       setExporting(true);
+      // Attempt to capture thumbnail and a small timeline image for the PDF
+      const thumbnail = captureThumbnail(videoRef);
+      const timeline_png = timelineToPNG(deceptionTimeline);
+      let top_moments = computeTopMoments(deceptionTimeline, transcriptHistory, 5);
+      try {
+        for (let i = 0; i < top_moments.length; i++) {
+          const tm = top_moments[i];
+          if (tm && tm.time_ms) {
+            // eslint-disable-next-line no-await-in-loop
+            tm.video_snippet = await captureSnippetAtMs(videoRef, tm.time_ms, deceptionTimeline);
+          } else {
+            tm.video_snippet = null;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to capture some top moment snippets', e);
+      }
 
       // Build payload from current state
+      const avgFusion = computeAvgFusion(deceptionTimeline, fusionScore);
+
       const payload = {
         session_id: `webcam-${Date.now()}`,
         timestamp: new Date().toISOString(),
-        fusion_score: fusionScore,
-        modalities: {
-          // server template expects a simple numeric score per modality (use deceptive score at index 1)
-          face: (faceVec && faceVec.length > 1) ? faceVec[1] : null,
-          voice: (voiceVec && voiceVec.length > 1) ? voiceVec[1] : null,
-          text: (textVec && textVec.length > 1) ? textVec[1] : null
-        },
+        fusion_score: avgFusion,
         timeline: deceptionTimeline,
         transcript: transcriptHistory,
-        top_moments: []
+        top_moments: top_moments,
+        thumbnail_url: thumbnail,
+        timeline_png: timeline_png,
+        video_url: null
       };
 
-      const resp = await fetch('http://localhost:8000/api/export-summary', {
+      // DEBUG: log payload and relevant state
+      try { console.debug('Export payload (webcam):', { payload, voiceResults, textVec, transcriptHistory }); } catch (e) { }
+
+      const respPromise = fetch('http://localhost:8000/api/export-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      const resp = await respPromise;
 
       const contentType = resp.headers.get('content-type') || '';
       if (resp.ok && contentType.includes('application/pdf')) {
@@ -117,6 +139,15 @@ export default function WebcamPage() {
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
+        // Clear transient analysis data after successful export
+        try { setTranscriptHistory([]); } catch (e) { }
+        try { setVoiceResults([]); } catch (e) { }
+        try { setFaceEmotions([]); } catch (e) { }
+        try { setDeceptionTimeline([]); } catch (e) { }
+        try { setFusionScore(null); } catch (e) { }
+        
+        // Also clear internal buffers in AudioProcessor
+        try { if (window && window.__clearAudioTranscripts) { window.__clearAudioTranscripts(); } } catch (e) { }
       } else {
         // Try to parse JSON error
         let bodyText = await resp.text();
@@ -127,6 +158,7 @@ export default function WebcamPage() {
           alert('Export failed: ' + bodyText);
         }
       }
+      return resp;
     } catch (e) {
       console.error('Export error', e);
       alert('Export failed: ' + e.message);
@@ -146,7 +178,7 @@ export default function WebcamPage() {
       <div className="first-pane">
         {/* Video area */}
         <div style={{ position: 'relative' }}>
-          <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} />
+          <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} onVideoRef={setVideoRef} />
         </div>
       </div>
 

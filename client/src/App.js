@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import WebcamPage from './pages/WebcamPage';
 import FileUploadPage from './pages/FileUploadPage';
@@ -57,20 +57,45 @@ function Navigation() {
         Upload
       </Link>
         <div className="mode-separator">
-          <button
-            onClick={() => {
-              if (window.__exportSession && typeof window.__exportSession === 'function') {
-                window.__exportSession();
-              } else {
-                alert('Export not available on this page');
-              }
-            }}
-            className="nav-export-btn"
-          >
-            Export Summary
-          </button>
+          {/* Export button shows progress and is disabled while exporting */}
+          <ExportButton />
         </div>
     </nav>
+  );
+}
+
+function ExportButton() {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleClick = async () => {
+    if (!window.__exportSession || typeof window.__exportSession !== 'function') {
+      alert('Export not available on this page');
+      return;
+    }
+    try {
+      setIsExporting(true);
+      const result = window.__exportSession();
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
+    } catch (e) {
+      console.error('Export failed', e);
+      alert('Export failed: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className="nav-export-btn"
+      disabled={isExporting}
+      aria-busy={isExporting}
+      style={{ opacity: isExporting ? 0.7 : 1 }}
+    >
+      {isExporting ? 'Exporting...' : 'Export Summary'}
+    </button>
   );
 }
 

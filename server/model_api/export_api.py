@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from datetime import datetime
 import asyncio
 import tempfile
 import os
@@ -19,18 +20,14 @@ if not logger.handlers:
     logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-# Note: Windows event-loop policy is set in server/asgi.py before the app imports
-# so we avoid touching it here and keep this module focused on rendering.
-
-# Use Playwright to render HTML to PDF for more robust cross-platform behavior.
+# Use Playwright to render HTML to PDF.
 async def _html_to_pdf(html: str, output_path: str):
-    # Use Playwright's synchronous API inside a separate thread. This avoids
+    # Use Playwright synchronous API inside a separate thread to avoid
     # running Playwright's subprocess creation on the asyncio event loop which
     # can raise NotImplementedError on some Windows setups.
     try:
         from playwright.sync_api import sync_playwright
     except Exception as e:
-        # Fail fast with a clear instruction to install Playwright and browsers
         raise RuntimeError(
             "playwright (sync API) is required: run `pip install playwright` and then `python -m playwright install` in the server venv") from e
 
@@ -39,6 +36,7 @@ async def _html_to_pdf(html: str, output_path: str):
             browser = pw.chromium.launch(headless=True)
             page = browser.new_page()
             page.set_content(html, wait_until='networkidle')
+
             # Save to PDF with print background and A4 format
             page.pdf(path=output_path, format='A4', print_background=True)
             browser.close()
@@ -49,9 +47,8 @@ async def _html_to_pdf(html: str, output_path: str):
 
 @router.post("/api/export-summary")
 async def export_summary(request: Request):
-    """Accepts a JSON payload with session data and returns a rendered PDF summary.
-
-    Expected JSON shape (example):
+    """
+    Expected JSON shape:
     {
       "session_id": "abc123",
       "timestamp": "2025-09-09T12:00:00Z",
@@ -77,6 +74,76 @@ async def export_summary(request: Request):
     # Render Jinja2 template with session data
     templates_dir = os.path.join(os.path.dirname(__file__), 'templates')
     env = Environment(loader=FileSystemLoader(templates_dir), autoescape=select_autoescape(['html', 'xml']))
+    # Helper filter: convert epoch-ms (number) to HH:MM:SS for compact timestamps in PDFs
+    def _fmt_time(ms):
+        """Strict formatter: accept ISO string or numeric epoch-ms and return HH:MM:SS, otherwise ''."""
+        if ms is None:
+            return ''
+        # ISO string
+        if isinstance(ms, str):
+            try:
+                dt = datetime.fromisoformat(ms.replace('Z', '+00:00'))
+                return dt.strftime('%H:%M:%S')
+            except Exception:
+                return ''
+        # numeric epoch-ms
+        if isinstance(ms, (int, float)):
+            try:
+                dt = datetime.fromtimestamp(float(ms) / 1000.0)
+                return dt.strftime('%H:%M:%S')
+            except Exception:
+                return ''
+        return ''
+
+    env.filters['fmt_time'] = _fmt_time
+    # Helper filter: format a full datetime for cover/title lines
+    def _fmt_datetime(val):
+        """Strict datetime formatter: accept ISO string or numeric epoch-ms and return friendly localized string, otherwise ''."""
+        if val is None:
+            return ''
+        if isinstance(val, str):
+            try:
+                dt = datetime.fromisoformat(val.replace('Z', '+00:00'))
+            except Exception:
+                return ''
+        else:
+            try:
+                dt = datetime.fromtimestamp(float(val) / 1000.0)
+            except Exception:
+                return ''
+        try:
+            dt_local = dt.astimezone()
+        except Exception:
+            dt_local = dt
+        return dt_local.strftime('%b %d, %Y, %I:%M %p')
+
+    env.filters['fmt_datetime'] = _fmt_datetime
+    # Helper filter: format a time offset (seconds or milliseconds) as MM:SS or H:MM:SS
+    def _fmt_offset(val):
+        """Format an offset in seconds or milliseconds to MM:SS or H:MM:SS. Accepts numeric or numeric string. No epoch fallbacks."""
+        if val is None:
+            return ''
+        try:
+            if isinstance(val, str):
+                v = float(val)
+            else:
+                v = float(val)
+        except Exception:
+            return ''
+
+        # Treat values >1000 as milliseconds
+        if v > 1000:
+            total_seconds = int(round(v / 1000.0))
+        else:
+            total_seconds = int(round(v))
+
+        hours, rem = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        if hours:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
+
+    env.filters['fmt_offset'] = _fmt_offset
     tpl = env.get_template('summary.html')
     try:
         html = tpl.render(session=data)
@@ -122,12 +189,8 @@ async def export_summary(request: Request):
         except Exception:
             pass
 
-        msg = str(e)
-        if 'playwright is required' in msg:
-            detail = msg + "; ensure Playwright is installed and run `python -m playwright install`"
-            return _error_response("playwright_unavailable", detail, tb)
-
-        return _error_response("PDF rendering failed", msg, tb)
+    msg = str(e)
+    return _error_response("PDF rendering failed", msg, tb)
 
 
 def _safe_remove(path: str) -> None:

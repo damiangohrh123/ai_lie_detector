@@ -1,89 +1,164 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Session Summary - {{ session.session_id or 'unknown' }}</title>
-    <style>
-      body { font-family: Arial, sans-serif; color: #222; margin: 28px; }
-      .cover { text-align: center; margin-top: 80px; }
-      .title { font-size: 28px; font-weight: 700; }
-      .meta { color: #666; margin-top: 6px; }
-      .section { margin-top: 28px; }
-      .two-col { display: flex; gap: 16px; }
-      .col { flex: 1; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { text-align: left; padding: 6px 8px; }
-      th { background: #f6f6f6; }
-      .timeline { width: 100%; height: 200px; background: #fff; border: 1px solid #eee; display:flex; align-items:center; justify-content:center; }
-      .thumbnail { max-width: 320px; border: 1px solid #ddd; }
-    </style>
-  </head>
-  <body>
-    <div class="cover">
-      <div class="title">Session Summary</div>
-      <div class="meta">Session: {{ session.session_id or 'unknown' }} — {{ session.timestamp or '' }}</div>
-    </div>
 
-    <div class="section two-col">
-      <div class="col">
-        <h3>Key summary</h3>
-        <table>
-          <tr><th>Overall truthfulness</th><td>{{ '%.2f'|format(session.fusion_score or 0.0) }}</td></tr>
-          <tr><th>Face (score)</th><td>{{ session.modalities.face if session.modalities and session.modalities.face is defined else 'N/A' }}</td></tr>
-          <tr><th>Voice (score)</th><td>{{ session.modalities.voice if session.modalities and session.modalities.voice is defined else 'N/A' }}</td></tr>
-          <tr><th>Text (score)</th><td>{{ session.modalities.text if session.modalities and session.modalities.text is defined else 'N/A' }}</td></tr>
-        </table>
+<head>
+  <meta charset="utf-8" />
+  <title>Session Summary - {{ session.session_id or 'unknown' }}</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; color: #111827; background: #ffffff; margin: 24px; }
+    .cover { text-align: center; margin-top: 36px; margin-bottom: 18px; }
+    .title { font-size: 28px; font-weight: 700; color: #111827; }
+    .meta { color: #6b7280; margin-top: 6px; font-size: 13px; }
 
-        <h4 style="margin-top:12px">Top flagged moments</h4>
-        <table>
-          <tr><th>Time</th><th>Snippet</th><th>Risk</th></tr>
-          {% for item in (session.top_moments or [])[:10] %}
-            <tr>
-              <td>{{ item.start }}</td>
-              <td>{{ item.text }}</td>
-              <td>{{ item.risk or '' }}</td>
-            </tr>
-          {% endfor %}
-        </table>
-      </div>
-      <div class="col">
-        <h3>Timeline</h3>
-        <div class="timeline">
-          {% if session.timeline_png %}
-            <img src="{{ session.timeline_png }}" alt="timeline" style="max-width:100%; max-height:180px;" />
+    /* Layout container */
+    .content { max-width: 980px; margin: 18px auto; }
+    .two-col { display: flex; gap: 18px; }
+    .col { flex: 1; }
+
+    /* Card style */
+    .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+    h3, h4 { margin: 6px 0 10px 0; color: #111827; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; vertical-align: middle; }
+    th { background: transparent; color: #374151; font-weight: 600; width: 55%; }
+    td { color: #111827; }
+    tr + tr td { border-top: 1px solid #f3f4f6; }
+
+    /* Timeline image container */
+    .timeline { width: 100%; height: 180px; display:flex; align-items:center; justify-content:center; }
+    .thumbnail { max-width: 320px; border: 1px solid #e5e7eb; border-radius: 8px; }
+
+  /* Small badge style */
+  .badge { display:inline-block; padding:4px 8px; border-radius:8px; font-size:12px; color:#111827; background:#fef3c7; border:1px solid #fcd34d; }
+
+  /* Risk badge styles */
+  .risk-badge { display:inline-block; padding:6px 10px; border-radius:10px; font-size:13px; font-weight:600; min-width:72px; text-align:center; }
+  .risk-high { background:#fee2e2; border:1px solid #fca5a5; color:#9b1c1c; }
+  .risk-medium { background:#fff7ed; border:1px solid #fdba74; color:#92400e; }
+  .risk-low { background:#ecfdf5; border:1px solid #86efac; color:#065f46; }
+  .risk-neutral { background:#f3f4f6; border:1px solid #e5e7eb; color:#374151; }
+
+  /* Time + moment thumbnail */
+  .time-with-thumb { display:flex; align-items:flex-start; gap:8px; }
+  .moment-thumb { width:72px; height:54px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; }
+  .time-text { color:#6b7280; font-size:12px; line-height:1.1; display:block; }
+
+  /* Transcript table styles */
+  .transcript-row td { padding: 10px; }
+  .time-cell { color: #6b7280; width: 120px; }
+  </style>
+</head>
+
+<body>
+  <div class="cover">
+    <div class="title">Session Summary</div>
+  <div class="meta">Video Analysis Session &mdash; {{ session.timestamp | fmt_datetime }}</div>
+  </div>
+
+  <div class="content">
+
+    <div class="two-col">
+      <div class="left">
+        <div class="card">
+          <h3>Thumbnail</h3>
+          {% if session.thumbnail_url %}
+          <img class="thumbnail" src="{{ session.thumbnail_url }}" alt="thumbnail" />
           {% else %}
-            [Timeline image will be inserted in high-fidelity version]
+          <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af">No thumbnail
+          </div>
           {% endif %}
         </div>
+      </div>
 
-        {% if session.thumbnail_url %}
-        <h4 style="margin-top:12px">Thumbnail</h4>
-        <img class="thumbnail" src="{{ session.thumbnail_url }}" alt="thumbnail" />
-        {% endif %}
+      <div class="right">
+        <div class="card">
+          <h3>Key summary</h3>
+          <table>
+            <tr>
+              <th>Overall truthfulness</th>
+              <td>{{ (session.fusion_score or 0.0) | round(2) }}</td>
+            </tr>
+          </table>
+        </div>
 
-        {% if session.video_url %}
-        <p style="font-size:12px;color:#666;margin-top:8px">Video (not embedded): {{ session.video_url }}</p>
-        {% endif %}
+        <div class="card">
+          <h3>Timeline</h3>
+          <div class="timeline">
+            {% if session.timeline_png %}
+            <img src="{{ session.timeline_png }}" alt="timeline" style="max-width:100%; max-height:160px;" />
+            {% else %}
+            <div style="color:#9ca3af">[Timeline image will be inserted in high-fidelity version]</div>
+            {% endif %}
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="section">
-      <h3>Transcript</h3>
+    <div class="card" style="margin-top:18px">
+      <h4>Top flagged moments</h4>
       <table>
-        <tr><th>Start</th><th>End</th><th>Text</th></tr>
-        {% for seg in (session.transcript or []) %}
-          <tr>
-            <td>{{ seg.start }}</td>
-            <td>{{ seg.end }}</td>
-            <td>{{ seg.text }}</td>
-          </tr>
+        <tr>
+          <th>Time</th>
+          <th>Snippet</th>
+          <th>Risk</th>
+        </tr>
+        {% for item in (session.top_moments or [])[:10] %}
+        <tr>
+          <td>
+            <div class="time-with-thumb">
+              <div>
+                {# prefer item.time_ms (ms) else item.start (seconds) #}
+                {% set ts = (item.time_ms if item.time_ms is defined else (item.start if item.start is defined else None)) %}
+                {% if ts %}
+                  <span class="time-text">{{ ts | fmt_offset }}</span>
+                {% else %}
+                  <span class="time-text">--:--</span>
+                {% endif %}
+              </div>
+              {% if item.video_snippet %}
+                <img class="moment-thumb" src="{{ item.video_snippet }}" alt="snippet" />
+              {% endif %}
+            </div>
+          </td>
+          <td>{{ item.text }}</td>
+          <td>
+            {% set r = item.risk if item.risk is defined else '' %}
+            {% if 'High' in r %}
+              <span class="risk-badge risk-high">{{ r }}</span>
+            {% elif 'Medium' in r %}
+              <span class="risk-badge risk-medium">{{ r }}</span>
+            {% elif 'Low' in r %}
+              <span class="risk-badge risk-low">{{ r }}</span>
+            {% elif r %}
+              <span class="risk-badge risk-neutral">{{ r }}</span>
+            {% else %}
+              &ndash;
+            {% endif %}
+          </td>
+        </tr>
         {% endfor %}
       </table>
     </div>
 
-    <div class="section">
-      <h3>Metadata</h3>
-      <pre style="font-size:11px; color:#444; background:#f9f9f9; padding:8px;">{{ session | tojson(indent=2) }}</pre>
+    <div class="card" style="margin-top:18px">
+      <h3>Transcript</h3>
+      <table>
+        <tr>
+          <th>Time</th>
+          <th>Text</th>
+        </tr>
+        {% for seg in (session.transcript or []) %}
+        <tr class="transcript-row">
+          <td class="time-cell">{{ seg.start | fmt_time }}</td>
+          <td>{{ seg.text }}</td>
+        </tr>
+        {% endfor %}
+      </table>
     </div>
-  </body>
+
+  </div> <!-- .content -->
+
+</body>
+
 </html>
