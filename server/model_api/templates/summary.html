@@ -21,7 +21,7 @@
 
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 8px 10px; vertical-align: middle; }
-    th { background: transparent; color: #374151; font-weight: 600; width: 55%; }
+    th { background: transparent; color: #374151; font-weight: 600; }
     td { color: #111827; }
     tr + tr td { border-top: 1px solid #f3f4f6; }
 
@@ -39,21 +39,30 @@
   .risk-low { background:#ecfdf5; border:1px solid #86efac; color:#065f46; }
   .risk-neutral { background:#f3f4f6; border:1px solid #e5e7eb; color:#374151; }
 
-  /* Time + moment thumbnail */
-  .time-with-thumb { display:flex; align-items:flex-start; gap:8px; }
+  /* Moment thumbnail */
   .moment-thumb { width:72px; height:54px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; }
   .time-text { color:#6b7280; font-size:12px; line-height:1.1; display:block; }
 
   /* Transcript table styles */
   .transcript-row td { padding: 10px; }
   .time-cell { color: #6b7280; width: 120px; }
+  
+  /* Fusion summary styles */
+  .fusion-summary { padding: 8px 6px; }
+  .fusion-percent { font-size: 42px; font-weight: 700; color: #10b981; line-height: 1; }
+  .fusion-sub { color: #10b981; font-size: 13px; margin-top: 4px; margin-bottom: 8px; }
+  .fusion-progress { background: #f3f4f6; border-radius: 8px; height: 12px; overflow: hidden; }
+  .fusion-bar { height: 100%; border-radius: 8px; transition: width 300ms ease; }
+  .bar-good { background: linear-gradient(90deg,#34d399,#10b981); }
+  .bar-medium { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
+  .bar-bad { background: linear-gradient(90deg,#f87171,#ef4444); }
   </style>
 </head>
 
 <body>
   <div class="cover">
     <div class="title">Session Summary</div>
-  <div class="meta">Video Analysis Session &mdash; {{ session.timestamp | fmt_datetime }}</div>
+    <div class="meta">Video Analysis Session &mdash; {{ session.timestamp | fmt_datetime }}</div>
   </div>
 
   <div class="content">
@@ -63,32 +72,46 @@
         <div class="card">
           <h3>Thumbnail</h3>
           {% if session.thumbnail_url %}
-          <img class="thumbnail" src="{{ session.thumbnail_url }}" alt="thumbnail" />
+            <img class="thumbnail" src="{{ session.thumbnail_url }}" alt="thumbnail" />
           {% else %}
-          <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af">No thumbnail
-          </div>
+            <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af">No thumbnail</div>
           {% endif %}
         </div>
       </div>
 
       <div class="right">
         <div class="card">
-          <h3>Key summary</h3>
-          <table>
-            <tr>
-              <th>Overall truthfulness</th>
-              <td>{{ (session.fusion_score or 0.0) | round(2) }}</td>
-            </tr>
-          </table>
+          <h3>Overall Truthfulness</h3>
+          {# Compute a friendly percentage and show a styled progress bar similar to the app UI #}
+          {% set score = session.fusion_score if session.fusion_score is defined and session.fusion_score is not none else 0.0 %}
+          {% set pct = (score * 100) | round(1) %}
+          {% if score >= 0.66 %}
+            {% set label = 'High Confidence - Truthful' %}
+            {% set bar_class = 'bar-good' %}
+          {% elif score >= 0.4 %}
+            {% set label = 'Medium Confidence - Mixed' %}
+            {% set bar_class = 'bar-medium' %}
+          {% else %}
+            {% set label = 'High Confidence - Deceptive' %}
+            {% set bar_class = 'bar-bad' %}
+          {% endif %}
+
+          <div class="fusion-summary">
+            <div class="fusion-percent">{{ pct }}%</div>
+            <div class="fusion-sub">{{ label }}</div>
+            <div class="fusion-progress" aria-hidden="true">
+              <div class="fusion-bar {{ bar_class }}" data-width="{{ pct }}"></div>
+            </div>
+          </div>
         </div>
 
         <div class="card">
           <h3>Timeline</h3>
           <div class="timeline">
             {% if session.timeline_png %}
-            <img src="{{ session.timeline_png }}" alt="timeline" style="max-width:100%; max-height:160px;" />
+              <img src="{{ session.timeline_png }}" alt="timeline" style="max-width:100%; max-height:160px;" />
             {% else %}
-            <div style="color:#9ca3af">[Timeline image will be inserted in high-fidelity version]</div>
+              <div style="color:#9ca3af">[Timeline image will be inserted in high-fidelity version]</div>
             {% endif %}
           </div>
         </div>
@@ -101,27 +124,32 @@
         <tr>
           <th>Time</th>
           <th>Snippet</th>
+          <th>Text</th>
           <th>Risk</th>
         </tr>
         {% for item in (session.top_moments or [])[:10] %}
         <tr>
-          <td>
-            <div class="time-with-thumb">
-              <div>
-                {# prefer item.time_ms (ms) else item.start (seconds) #}
-                {% set ts = (item.time_ms if item.time_ms is defined else (item.start if item.start is defined else None)) %}
-                {% if ts %}
-                  <span class="time-text">{{ ts | fmt_offset }}</span>
-                {% else %}
-                  <span class="time-text">--:--</span>
-                {% endif %}
-              </div>
-              {% if item.video_snippet %}
-                <img class="moment-thumb" src="{{ item.video_snippet }}" alt="snippet" />
-              {% endif %}
-            </div>
+          <td class="time-cell">
+
+            {% if item.start is defined and item.start and (item.start|lower != 'none') %}
+              <span class="time-text">{{ item.start }}</span>
+            {% elif item.time_ms is defined and item.time_ms %}
+              <span class="time-text">{{ item.time_ms | fmt_time }}</span>
+            {% else %}
+              <span class="time-text">--:--</span>
+            {% endif %}
           </td>
+
+          <td>
+            {% if item.video_snippet %}
+              <img class="moment-thumb" src="{{ item.video_snippet }}" alt="snippet" />
+            {% else %}
+              &ndash;
+            {% endif %}
+          </td>
+
           <td>{{ item.text }}</td>
+
           <td>
             {% set r = item.risk if item.risk is defined else '' %}
             {% if 'High' in r %}
@@ -158,6 +186,22 @@
     </div>
 
   </div> <!-- .content -->
+
+  <script>
+    // Apply widths to fusion bars from their data attributes. Kept simple and tolerant for PDF rendering.
+    (function(){
+      try{
+        var bars = document.querySelectorAll('.fusion-bar[data-width]');
+        for(var i=0;i<bars.length;i++){
+          var b = bars[i];
+          var w = parseFloat(b.getAttribute('data-width') || '0');
+          if(!isFinite(w) || w < 0) { w = 0; }
+          if(w > 100) { w = 100; }
+          b.style.width = w + '%';
+        }
+      }catch(e){ /* no-op */ }
+    })();
+  </script>
 
 </body>
 
