@@ -5,57 +5,217 @@
   <meta charset="utf-8" />
   <title>Session Summary - {{ session.session_id or 'unknown' }}</title>
   <style>
-    body { font-family: Inter, Arial, sans-serif; color: #111827; background: #ffffff; margin: 24px; }
-    .cover { text-align: center; margin-top: 36px; margin-bottom: 18px; }
-    .title { font-size: 28px; font-weight: 700; color: #111827; }
-    .meta { color: #6b7280; margin-top: 6px; font-size: 13px; }
+    body {
+      font-family: Inter, Arial, sans-serif;
+      color: #111827;
+      background: #ffffff;
+      margin: 24px;
+    }
+
+    .cover {
+      text-align: center;
+      margin-top: 36px;
+      margin-bottom: 18px;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .meta {
+      color: #6b7280;
+      margin-top: 6px;
+      font-size: 13px;
+    }
 
     /* Layout container */
-    .content { max-width: 980px; margin: 18px auto; }
-    .two-col { display: flex; gap: 18px; }
-    .col { flex: 1; }
+    .content {
+      max-width: 980px;
+      margin: 18px auto;
+    }
+
+    .two-col {
+      display: flex;
+      gap: 18px;
+    }
+
+    .col {
+      flex: 1;
+    }
 
     /* Card style */
-    .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
-    h3, h4 { margin: 6px 0 10px 0; color: #111827; }
+    .card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
 
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 8px 10px; vertical-align: middle; }
-    th { background: transparent; color: #374151; font-weight: 600; }
-    td { color: #111827; }
-    tr + tr td { border-top: 1px solid #f3f4f6; }
+    h3,
+    h4 {
+      margin: 6px 0 10px 0;
+      color: #111827;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px 10px;
+      vertical-align: middle;
+    }
+
+    th {
+      background: transparent;
+      color: #374151;
+      font-weight: 600;
+    }
+
+    td {
+      color: #111827;
+    }
+
+    tr+tr td {
+      border-top: 1px solid #f3f4f6;
+    }
 
     /* Timeline image container */
-    .timeline { width: 100%; height: 180px; display:flex; align-items:center; justify-content:center; }
-    .thumbnail { max-width: 320px; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .timeline {
+      width: 100%;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-  /* Small badge style */
-  .badge { display:inline-block; padding:4px 8px; border-radius:8px; font-size:12px; color:#111827; background:#fef3c7; border:1px solid #fcd34d; }
+    .thumbnail {
+      max-width: 320px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
 
-  /* Risk badge styles */
-  .risk-badge { display:inline-block; padding:6px 10px; border-radius:10px; font-size:13px; font-weight:600; min-width:72px; text-align:center; }
-  .risk-high { background:#fee2e2; border:1px solid #fca5a5; color:#9b1c1c; }
-  .risk-medium { background:#fff7ed; border:1px solid #fdba74; color:#92400e; }
-  .risk-low { background:#ecfdf5; border:1px solid #86efac; color:#065f46; }
-  .risk-neutral { background:#f3f4f6; border:1px solid #e5e7eb; color:#374151; }
+    /* Small badge style */
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #111827;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+    }
 
-  /* Moment thumbnail */
-  .moment-thumb { width:72px; height:54px; object-fit:cover; border-radius:6px; border:1px solid #e5e7eb; }
-  .time-text { color:#6b7280; font-size:12px; line-height:1.1; display:block; }
+    /* Risk badge styles */
+    .risk-badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 72px;
+      text-align: center;
+    }
 
-  /* Transcript table styles */
-  .transcript-row td { padding: 10px; }
-  .time-cell { color: #6b7280; width: 120px; }
-  
-  /* Fusion summary styles */
-  .fusion-summary { padding: 8px 6px; }
-  .fusion-percent { font-size: 42px; font-weight: 700; color: #10b981; line-height: 1; }
-  .fusion-sub { color: #10b981; font-size: 13px; margin-top: 4px; margin-bottom: 8px; }
-  .fusion-progress { background: #f3f4f6; border-radius: 8px; height: 12px; overflow: hidden; }
-  .fusion-bar { height: 100%; border-radius: 8px; transition: width 300ms ease; }
-  .bar-good { background: linear-gradient(90deg,#34d399,#10b981); }
-  .bar-medium { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
-  .bar-bad { background: linear-gradient(90deg,#f87171,#ef4444); }
+    .risk-high {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      color: #9b1c1c;
+    }
+
+    .risk-medium {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #92400e;
+    }
+
+    .risk-low {
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+      color: #065f46;
+    }
+
+    .risk-neutral {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+    }
+
+    /* Moment thumbnail */
+    .moment-thumb {
+      width: 72px;
+      height: 54px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .time-text {
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.1;
+      display: block;
+    }
+
+    /* Transcript table styles */
+    .transcript-row td {
+      padding: 10px;
+    }
+
+    .time-cell {
+      color: #6b7280;
+      width: 120px;
+    }
+
+    /* Fusion summary styles */
+    .fusion-summary {
+      padding: 8px 6px;
+    }
+
+    .fusion-percent {
+      font-size: 42px;
+      font-weight: 700;
+      color: #10b981;
+      line-height: 1;
+    }
+
+    .fusion-sub {
+      color: #10b981;
+      font-size: 13px;
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    .fusion-progress {
+      background: #f3f4f6;
+      border-radius: 8px;
+      height: 12px;
+      overflow: hidden;
+    }
+
+    .fusion-bar {
+      height: 100%;
+      border-radius: 8px;
+      transition: width 300ms ease;
+    }
+
+    .bar-good {
+      background: linear-gradient(90deg, #34d399, #10b981);
+    }
+
+    .bar-medium {
+      background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    }
+
+    .bar-bad {
+      background: linear-gradient(90deg, #f87171, #ef4444);
+    }
   </style>
 </head>
 
@@ -72,9 +232,10 @@
         <div class="card">
           <h3>Thumbnail</h3>
           {% if session.thumbnail_url %}
-            <img class="thumbnail" src="{{ session.thumbnail_url }}" alt="thumbnail" />
+          <img class="thumbnail" src="{{ session.thumbnail_url }}" alt="thumbnail" />
           {% else %}
-            <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af">No thumbnail</div>
+          <div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af">No thumbnail
+          </div>
           {% endif %}
         </div>
       </div>
@@ -83,17 +244,18 @@
         <div class="card">
           <h3>Overall Truthfulness</h3>
           {# Compute a friendly percentage and show a styled progress bar similar to the app UI #}
-          {% set score = session.fusion_score if session.fusion_score is defined and session.fusion_score is not none else 0.0 %}
+          {% set score = session.fusion_score if session.fusion_score is defined and session.fusion_score is not none
+          else 0.0 %}
           {% set pct = (score * 100) | round(1) %}
           {% if score >= 0.66 %}
-            {% set label = 'High Confidence - Truthful' %}
-            {% set bar_class = 'bar-good' %}
+          {% set label = 'High Confidence - Truthful' %}
+          {% set bar_class = 'bar-good' %}
           {% elif score >= 0.4 %}
-            {% set label = 'Medium Confidence - Mixed' %}
-            {% set bar_class = 'bar-medium' %}
+          {% set label = 'Medium Confidence - Mixed' %}
+          {% set bar_class = 'bar-medium' %}
           {% else %}
-            {% set label = 'High Confidence - Deceptive' %}
-            {% set bar_class = 'bar-bad' %}
+          {% set label = 'High Confidence - Deceptive' %}
+          {% set bar_class = 'bar-bad' %}
           {% endif %}
 
           <div class="fusion-summary">
@@ -109,9 +271,9 @@
           <h3>Timeline</h3>
           <div class="timeline">
             {% if session.timeline_png %}
-              <img src="{{ session.timeline_png }}" alt="timeline" style="max-width:100%; max-height:160px;" />
+            <img src="{{ session.timeline_png }}" alt="timeline" style="max-width:100%; max-height:160px;" />
             {% else %}
-              <div style="color:#9ca3af">[Timeline image will be inserted in high-fidelity version]</div>
+            <div style="color:#9ca3af">[Timeline image will be inserted in high-fidelity version]</div>
             {% endif %}
           </div>
         </div>
@@ -132,19 +294,19 @@
           <td class="time-cell">
 
             {% if item.start is defined and item.start and (item.start|lower != 'none') %}
-              <span class="time-text">{{ item.start }}</span>
+            <span class="time-text">{{ item.start }}</span>
             {% elif item.time_ms is defined and item.time_ms %}
-              <span class="time-text">{{ item.time_ms | fmt_time }}</span>
+            <span class="time-text">{{ item.time_ms | fmt_time }}</span>
             {% else %}
-              <span class="time-text">--:--</span>
+            <span class="time-text">--:--</span>
             {% endif %}
           </td>
 
           <td>
             {% if item.video_snippet %}
-              <img class="moment-thumb" src="{{ item.video_snippet }}" alt="snippet" />
+            <img class="moment-thumb" src="{{ item.video_snippet }}" alt="snippet" />
             {% else %}
-              &ndash;
+            &ndash;
             {% endif %}
           </td>
 
@@ -153,15 +315,15 @@
           <td>
             {% set r = item.risk if item.risk is defined else '' %}
             {% if 'High' in r %}
-              <span class="risk-badge risk-high">{{ r }}</span>
+            <span class="risk-badge risk-high">{{ r }}</span>
             {% elif 'Medium' in r %}
-              <span class="risk-badge risk-medium">{{ r }}</span>
+            <span class="risk-badge risk-medium">{{ r }}</span>
             {% elif 'Low' in r %}
-              <span class="risk-badge risk-low">{{ r }}</span>
+            <span class="risk-badge risk-low">{{ r }}</span>
             {% elif r %}
-              <span class="risk-badge risk-neutral">{{ r }}</span>
+            <span class="risk-badge risk-neutral">{{ r }}</span>
             {% else %}
-              &ndash;
+            &ndash;
             {% endif %}
           </td>
         </tr>
@@ -176,7 +338,9 @@
           <th>Time</th>
           <th>Text</th>
         </tr>
-        {% for seg in (session.transcript or []) %}
+        {% set transcript_rows = session.transcript_capitalized if session.transcript_capitalized is defined and
+        session.transcript_capitalized else (session.transcript or []) %}
+        {% for seg in transcript_rows %}
         <tr class="transcript-row">
           <td class="time-cell">{{ seg.start | fmt_time }}</td>
           <td>{{ seg.text }}</td>
@@ -189,17 +353,17 @@
 
   <script>
     // Apply widths to fusion bars from their data attributes. Kept simple and tolerant for PDF rendering.
-    (function(){
-      try{
+    (function () {
+      try {
         var bars = document.querySelectorAll('.fusion-bar[data-width]');
-        for(var i=0;i<bars.length;i++){
+        for (var i = 0; i < bars.length; i++) {
           var b = bars[i];
           var w = parseFloat(b.getAttribute('data-width') || '0');
-          if(!isFinite(w) || w < 0) { w = 0; }
-          if(w > 100) { w = 100; }
+          if (!isFinite(w) || w < 0) { w = 0; }
+          if (w > 100) { w = 100; }
           b.style.width = w + '%';
         }
-      }catch(e){ /* no-op */ }
+      } catch (e) { /* no-op */ }
     })();
   </script>
 

@@ -64,6 +64,9 @@ export function computeTopMoments(deceptionTimeline, transcriptHistory, n = 5, d
         if (best) snippet = best.text || '';
       }
 
+      // Capitalize snippets
+      try { snippet = capitalizeTranscription(snippet); } catch (e) { /* ignore */ }
+
       const dObj = new Date(momentMs);
       const hh = String(dObj.getHours()).padStart(2, '0');
       const mm = String(dObj.getMinutes()).padStart(2, '0');
@@ -94,7 +97,7 @@ export async function captureSnippetAtMs(videoRef, momentMs, deceptionTimeline) 
         const onSeek = () => { v.removeEventListener('seeked', onSeek); resolve(); };
         v.addEventListener('seeked', onSeek);
         v.currentTime = Math.min(targetSec, Math.max(0, v.duration));
-        setTimeout(() => { try { v.removeEventListener('seeked', onSeek); } catch(e){}; resolve(); }, 800);
+        setTimeout(() => { try { v.removeEventListener('seeked', onSeek); } catch (e) { }; resolve(); }, 800);
       });
     }
     const w = 320;
@@ -115,4 +118,17 @@ export function computeAvgFusion(deceptionTimeline, fusionScore) {
   const vals = arr.map(d => (typeof d.score === 'number' ? d.score : null)).filter(v => v != null);
   if (!vals.length) return null;
   return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+// Shared capitalization helper to normalize transcripts
+export function capitalizeTranscription(text = '') {
+  if (typeof text !== 'string') return '';
+  let s = text.replace(/\s+/g, ' ').trim();
+  s = s.replace(/\bi'm\b/gi, "I'm")
+    .replace(/\bi've\b/gi, "I've")
+    .replace(/\bi'd\b/gi, "I'd")
+    .replace(/\bi'll\b/gi, "I'll")
+    .replace(/\bi\b/g, "I");
+  if (s.length > 0) s = s.charAt(0).toUpperCase() + s.slice(1);
+  return s;
 }

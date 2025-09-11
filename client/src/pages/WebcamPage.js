@@ -5,7 +5,7 @@ import FaceAnalysisBars from '../components/FaceAnalysisBars';
 import SpeechPatternPanel from '../components/SpeechPatternPanel';
 import FusionTruthfulness from '../components/FusionTruthfulness';
 import DeceptionTimeline from '../components/DeceptionTimeline';
-import { captureThumbnail, timelineToPNG, computeTopMoments, captureSnippetAtMs, computeAvgFusion } from '../utils/exportHelpers';
+import { captureThumbnail, timelineToPNG, computeTopMoments, captureSnippetAtMs, computeAvgFusion, capitalizeTranscription } from '../utils/exportHelpers';
 
 export default function WebcamPage() {
   const [faceEmotions, setFaceEmotions] = useState([]);
@@ -112,6 +112,7 @@ export default function WebcamPage() {
         fusion_score: avgFusion,
         timeline: deceptionTimeline,
         transcript: transcriptHistory,
+        transcript_capitalized: (transcriptHistory || []).map(s => ({ ...s, text: capitalizeTranscription(s.text) })),
         top_moments: top_moments,
         thumbnail_url: thumbnail,
         timeline_png: timeline_png,
@@ -145,7 +146,7 @@ export default function WebcamPage() {
         try { setFaceEmotions([]); } catch (e) { }
         try { setDeceptionTimeline([]); } catch (e) { }
         try { setFusionScore(null); } catch (e) { }
-        
+
         // Also clear internal buffers in AudioProcessor
         try { if (window && window.__clearAudioTranscripts) { window.__clearAudioTranscripts(); } } catch (e) { }
       } else {

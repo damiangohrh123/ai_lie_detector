@@ -6,7 +6,7 @@ import SpeechPatternPanel from '../components/SpeechPatternPanel';
 import FusionTruthfulness from '../components/FusionTruthfulness';
 import DeceptionTimeline from '../components/DeceptionTimeline';
 import FileUploader from '../components/FileUploader';
-import { captureThumbnail, timelineToPNG, computeTopMoments, captureSnippetAtMs, computeAvgFusion } from '../utils/exportHelpers';
+import { captureThumbnail, timelineToPNG, computeTopMoments, captureSnippetAtMs, computeAvgFusion, capitalizeTranscription } from '../utils/exportHelpers';
 
 export default function FileUploadPage() {
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -130,6 +130,8 @@ export default function FileUploadPage() {
         fusion_score: avgFusion,
         timeline: deceptionTimeline,
         transcript: transcriptHistory,
+        // Add capitalized transcript segments
+        transcript_capitalized: (transcriptHistory || []).map(s => ({ ...s, text: capitalizeTranscription(s.text) })),
         top_moments: top_moments,
         // include uploaded file info if available
         video_name: uploadedFile?.name || uploadedFile?.fileName || null,
