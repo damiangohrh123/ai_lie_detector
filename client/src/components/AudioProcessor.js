@@ -33,6 +33,8 @@ export default function AudioProcessor({
   const transcriptBufferRef = useRef([]);
   const flushTimeoutRef = useRef(null);
   const MAX_SEGMENTS = 50;
+  const INACTIVITY_MS = 1500; // clear voice inputs after 1.5s of silence
+  const lastVoiceTimestampRef = useRef(null);
 
   // WebSocket connection
   const connectWebSocket = () => {
@@ -135,6 +137,8 @@ export default function AudioProcessor({
           // Also push to results for fusion
           setResults(prev => {
             const newResults = [...prev, { ...data, type: "voice_sentiment" }];
+            // update last voice timestamp so inactivity watcher knows we just had voice
+            lastVoiceTimestampRef.current = Date.now();
             return newResults.slice(-3);
           });
         }
@@ -319,6 +323,33 @@ export default function AudioProcessor({
 
     return () => clearInterval(cleanupInterval);
   }, []);
+
+  // Watch for voice inactivity and clear fusion inputs so voice stops contributing
+  useEffect(() => {
+    const checkInterval = setInterval(() => {
+      const last = lastVoiceTimestampRef.current;
+      const now = Date.now();
+      if (last && (now - last) > INACTIVITY_MS) {
+        // Clear voice-related buffers and notify parent immediately
+        try {
+          if (results && results.length > 0) setResults([]);
+        } catch (e) {}
+        try {
+          setVoiceEmotionHistory([]);
+        } catch (e) {}
+        try {
+          setIsProcessing(false);
+        } catch (e) {}
+        try {
+          if (setVoiceResults) setVoiceResults([]);
+        } catch (e) {}
+        // reset timestamp to avoid repeated clears
+        lastVoiceTimestampRef.current = null;
+      }
+    }, 500);
+
+    return () => clearInterval(checkInterval);
+  }, [results, setVoiceResults]);
 
   // Calculate average emotion
   const getAvgEmotion = (emotion) => {

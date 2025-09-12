@@ -249,32 +249,11 @@ body {
 
 
 
-.face-analysis-container {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex: 2;
-}
 
-.face-analysis-bars {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.face-analysis-bars-label {
-  color: var(--text-color);
-  font-weight: 500;
-  width: 70px;
-}
-
-.face-analysis-bar-background {
-  flex: 1;
-  height: 8px;
-  background-color: var(--bar-background-color);
-  border-radius: 4px;
-  margin: 0 20px 0 10px;
-}
+.face-analysis-container { display: flex; flex-direction: column; gap: 5px; }
+.face-analysis-bars { display: flex; align-items: center; margin-bottom: 10px; }
+.face-analysis-bars-label { color: var(--text-color); font-weight: 500; width: 70px; }
+.face-analysis-bar-background { flex: 1; height: 8px; background-color: var(--bar-background-color); border-radius: 4px; margin: 0 20px 0 10px; }
 
 
 
@@ -308,22 +287,26 @@ body {
 
 
 
-.card {
-  flex: 1;
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 18px;
-  text-align: center;
-  border: 1px solid var(--outline-color);
-  font-weight: 700;
-}
-
 
 
 .fusion-percent { font-size:48px; font-weight:500; }
 .fusion-confidence { font-size:14px; color:#666; }
 .truth-score-bar-background { width:100%; height:12px; background:#e6e9ee; border-radius: 999px; overflow:hidden; }
-.truth-score-fill { height:100%; border-radius:999px; transition: width 0.5s; }
+
+.truth-segments { display:flex; width:100%; height:12px; border-radius:999px; overflow:hidden; }
+.truth-segment { height:100%; transition: width 0.5s ease; }
+
+/* Modalities status badges */
+.modality-pill { display:flex; align-items:center; gap:12px; background:#f7fafc; padding:8px 12px; border-radius:8px; border:1px solid var(--outline-color); }
+.modality-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.modality-name { font-weight:600; }
+.modality-status { margin-left:auto; color:#475569; font-weight:600; }
+
+.badge { padding: 4px 8px; border-radius: 999px; font-weight:700; font-size:12px; margin-left:8px; display:inline-block; }
+.badge.contributing { background: #1565C0; color: white; box-shadow: 0 6px 14px rgba(21,101,192,0.12); }
+.badge.absent { background: #e6e9ee; color: #475569; }
+
+
 
 .fusion-modality-list { display:flex; flex-direction:column; gap:8px; width:100%; margin-top:8px; }
 .modality-pill { display:flex; align-items:center; gap:12px; background:#f7fafc; padding:8px 12px; border-radius:8px; border:1px solid var(--outline-color); }
@@ -447,14 +430,3 @@ body {
   align-items: center;
   gap: 8px;
 }
-
-.export-btn {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 700;
-}
-.export-btn:disabled { opacity: 0.6; cursor: default; }
