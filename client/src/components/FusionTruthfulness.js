@@ -113,27 +113,46 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
         <div className="fusion-footer">0% = Highly Deceptive &nbsp;|&nbsp; 100% = Completely Truthful</div>
 
         <div className="truth-score-bar-background" style={{ marginTop: 18 }}>
-          <div className="truth-segments">
-            {(() => {
-              const showAny = anyPresent && serverHasContrib;
-              const order = [
-                { key: 'voice', color: '#1565C0' },
-                { key: 'face', color: '#FF9800' },
-                { key: 'text', color: '#4CAF50' }
-              ];
+          <div
+            className="truth-score-fill"
+            style={{ width: truthScore !== null ? `${truthScore * 100}%` : '0%' }}
+            aria-hidden={truthScore === null}
+          >
+            <div className="truth-segments">
+              {(() => {
+                const showAny = anyPresent && serverHasContrib;
+                const order = [
+                  { key: 'voice', color: '#1565C0' },
+                  { key: 'face', color: '#FF9800' },
+                  { key: 'text', color: '#4CAF50' }
+                ];
 
-              if (!showAny) {
-                return [<div key="none" className="truth-segment" style={{ width: '100%', background: '#e5e7eb' }} />];
-              }
+                if (!showAny) {
+                  return [
+                    <div
+                      key="none"
+                      className="truth-segment"
+                      style={{ width: '100%', background: barColor }}
+                    />
+                  ];
+                }
 
-              return order.map(o => {
-                const rawContrib = result && result.contributions ? (result.contributions[o.key] || 0) : 0;
-                const w = Math.max(0, Math.min(1, rawContrib));
-                return (
-                  <div key={o.key} className="truth-segment" style={{ width: `${w * 100}%`, background: o.color }} />
-                );
-              });
-            })()}
+                // Calculate total contribution so we can show proportional slices inside the filled area
+                const contribs = order.map(o => ({ key: o.key, color: o.color, value: result && result.contributions ? (result.contributions[o.key] || 0) : 0 }));
+                const total = contribs.reduce((s, c) => s + Math.max(0, c.value), 0);
+
+                if (total <= 0) {
+                  return [<div key="none2" className="truth-segment" style={{ width: '100%', background: barColor }} />];
+                }
+
+                return contribs.map(c => {
+                  const ratio = Math.max(0, c.value) / total;
+                  return (
+                    <div key={c.key} className="truth-segment" style={{ width: `${ratio * 100}%`, background: c.color }} />
+                  );
+                });
+              })()}
+            </div>
           </div>
         </div>
 
