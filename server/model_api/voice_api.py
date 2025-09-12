@@ -2,57 +2,53 @@ from fastapi import APIRouter, WebSocket
 import io
 import wave
 import os
-import torch
-import torchaudio
-import numpy as np
-import httpx    
 import time
 import logging
-from transformers import pipeline
-
-# Import Vosk
-from vosk import Model as VoskModel, KaldiRecognizer
 import json
-import noisereduce as nr
-import webrtcvad
 import asyncio
-from scipy.signal import butter, lfilter
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import numpy as np
 
 router = APIRouter()
 
-# Load HuBERT SUPERB model once on startup
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-use_device = 0 if (device.type == 'cuda') else -1
-emotion_pipe = pipeline("audio-classification", model="superb/hubert-large-superb-er", device=use_device)
+# Module-level lazy state for heavy resources
+_state = {
+    'torch': None,
+    'torchaudio': None,
+    'np': np,
+    'emotion_pipe': None,
+    'vosk_model': None,
+    'KaldiRecognizer': None,
+    'emotion_labels': ['ang', 'hap', 'neu', 'sad'],
+    'init_lock': asyncio.Lock(),
+    'httpx_client': None
+}
 
-# Load Vosk model once on startup
-vosk_model = VoskModel("models/vosk-model-small-en-us-0.15") 
-
-emotion_labels = ["ang", "hap", "neu", "sad"]
+logger = logging.getLogger(__name__)
 
 def butter_bandpass(lowcut, highcut, fs, order=4):
     nyq = 0.5 * fs
     low = lowcut / nyq
     high = highcut / nyq
-    
+
     # Ensure frequencies are within valid range (0 < Wn < 1)
     low = max(0.001, min(0.999, low))
     high = max(0.001, min(0.999, high))
-    
+
     # Ensure low < high
     if low >= high:
         low = 0.001
         high = 0.999
-    
+
+    # Import locally to avoid top-level heavy deps
+    from scipy.signal import butter
     b, a = butter(order, [low, high], btype='band')
     return b, a
 
 def bandpass_filter(data, lowcut, highcut, fs, order=4):
     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+
+    # Import locally to avoid top-level heavy deps
+    from scipy.signal import lfilter
     y = lfilter(b, a, data)
     return y
 
@@ -62,40 +58,50 @@ def audio_preprocessing(audio_data, sample_rate):
         if sample_rate <= 0:
             logger.error(f"Invalid sample rate: {sample_rate}")
             return audio_data
-        
+
         if len(audio_data) == 0:
             logger.error("Empty audio data")
             return audio_data
-        
+
+        # Use top-level numpy (imported at module load)
+
         # Bandpass filter 80-8000 Hz
         filtered = bandpass_filter(audio_data, 80, 8000, sample_rate)
-        
+
         # Apply pre-emphasis filter to enhance high frequencies
         alpha = 0.97
         emphasized = np.append(filtered[0], filtered[1:] - alpha * filtered[:-1])
-        
+
         # Noise reduction using spectral gating
         noise_samples = int(0.1 * sample_rate)
         if len(emphasized) > noise_samples:
             noise_floor = np.mean(np.abs(emphasized[:noise_samples]))
             threshold = noise_floor * 2
             emphasized = np.where(np.abs(emphasized) < threshold, 0, emphasized)
-        
+
         # Normalization to [-1, 1] range
         if np.max(np.abs(emphasized)) > 0:
             emphasized = emphasized / np.max(np.abs(emphasized))
-        
+
         return emphasized
-        
+
     except Exception as e:
         logger.error(f"Audio preprocessing error: {e}")
         # Return original audio data on error
         return audio_data
 
+
 def analyze_emotion(audio_tensor_or_array, sr):
     start_time = time.time()
 
-    # Accept torch tensor or numpy array
+    # Accept torch tensor or numpy array and use state objects
+    torch = _state.get('torch')
+    emotion_pipe = _state.get('emotion_pipe')
+    emotion_labels = _state.get('emotion_labels')
+    if torch is None or emotion_pipe is None:
+        # Models not initialized, return neutral
+        return {label: 0.0 if label != 'neu' else 1.0 for label in emotion_labels}, 0.0
+
     if isinstance(audio_tensor_or_array, torch.Tensor):
         audio_numpy = audio_tensor_or_array.squeeze().cpu().numpy()
     else:
@@ -116,15 +122,17 @@ def analyze_emotion(audio_tensor_or_array, sr):
             sc = float(p.get("score", 0.0))
             if lbl in scores:
                 scores[lbl] = round(sc, 4)
-
         return scores, emotion_time
     except Exception as e:
         logger.error(f"Emotion detection error: {e}")
-        return {label: 0.0 if label != "neu" else 1.0 for label in emotion_labels}, 0.0
+        return {label: 0.0 if label != 'neu' else 1.0 for label in emotion_labels}, 0.0
+
 
 def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
     # Creates a VAD object
-    vad = webrtcvad.Vad(aggressiveness)
+    # import webrtcvad locally to avoid heavy top-level import
+    import webrtcvad
+    vad_inst = webrtcvad.Vad(aggressiveness)
 
     # squeeze() to remove extra dimensions. Converts from float32 to int16.
     audio = audio_tensor.squeeze().numpy()
@@ -134,8 +142,8 @@ def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
     frame_size = int(sr * frame_duration_ms / 1000)
     num_frames = len(audio_pcm) // frame_size
 
-    segments = [] # Store start_time and end_time of speech
-    triggered = False # Boolean flag to track if we are currently in a speech segment
+    segments = []  # Store start_time and end_time of speech
+    triggered = False  # Boolean flag to track if we are currently in a speech segment
     start_idx = 0
 
     # Loop through each frame,
@@ -149,7 +157,7 @@ def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
             break
 
         # Check if current frame contains speech
-        is_speech = vad.is_speech(frame.tobytes(), sr)
+        is_speech = vad_inst.is_speech(frame.tobytes(), sr)
 
         # If speech detected and currently not in speech segment, mark start of speech.
         if is_speech and not triggered:
@@ -166,20 +174,73 @@ def vad(audio_tensor, sr, frame_duration_ms=30, aggressiveness=3):
         segments.append((start_idx / sr, len(audio_pcm) / sr))
     return [(round(s, 2), round(e, 2)) for s, e in segments]
 
+
+async def init_voice_models(app=None):
+    """Initialize heavy voice/speech models and helpers. """
+    if _state.get('emotion_pipe') is not None and _state.get('vosk_model') is not None:
+        return
+
+    async with _state['init_lock']:
+        if _state.get('emotion_pipe') is not None and _state.get('vosk_model') is not None:
+            return
+        try:
+            # Lazy imports
+            import torch
+            import torchaudio
+            from transformers import pipeline
+            from vosk import Model as VoskModel, KaldiRecognizer
+
+            # Set torch in state for utility functions
+            _state['torch'] = torch
+            _state['torchaudio'] = torchaudio
+
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            use_device = 0 if (device.type == 'cuda') else -1
+            emotion_pipe = pipeline("audio-classification", model="superb/hubert-large-superb-er", device=use_device)
+
+            vosk_model = VoskModel("models/vosk-model-small-en-us-0.15")
+
+            _state['emotion_pipe'] = emotion_pipe
+            _state['vosk_model'] = vosk_model
+            _state['KaldiRecognizer'] = KaldiRecognizer
+
+            # Create a reusable AsyncClient for internal HTTP calls
+            try:
+                import httpx
+                _state['httpx_client'] = httpx.AsyncClient()
+            except Exception:
+                _state['httpx_client'] = None
+
+            if app is not None:
+                try:
+                    app.state.voice_models_loaded = True
+                except Exception:
+                    pass
+
+            logger.info("Voice models initialized")
+        except Exception as e:
+            logger.exception("Failed to initialize voice models: %s", e)
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint for Render monitoring"""
     try:
         # Quick test to ensure models are loaded
-        test_tensor = torch.zeros(1, 1000)  # 1000 samples = ~0.06s at 16kHz
-        emotion_test, _ = analyze_emotion(test_tensor, 16000)
-        
-        return {
-            "status": "healthy",
-            "models_loaded": True,
-            "emotion_labels": emotion_labels,
-            "vosk_model": "loaded"
-        }
+        try:
+            await init_voice_models()
+            torch = _state.get('torch')
+            emotion_labels = _state.get('emotion_labels')
+            vosk_model = _state.get('vosk_model')
+            test_tensor = torch.zeros(1, 1000)  # 1000 samples = ~0.06s at 16kHz
+            emotion_test, _ = analyze_emotion(test_tensor, 16000)
+            return {
+                "status": "healthy",
+                "models_loaded": True,
+                "emotion_labels": emotion_labels,
+                "vosk_model": ("loaded" if vosk_model is not None else "missing")
+            }
+        except Exception as e:
+            return {"status": "unhealthy", "error": str(e)}
     except Exception as e:
         return {
             "status": "unhealthy",
@@ -205,9 +266,22 @@ async def websocket_audio(websocket: WebSocket):
     global last_transcript
     await websocket.accept()
     sample_rate = 16000
-    recognizer = KaldiRecognizer(vosk_model, sample_rate) # Creates a Vosk recognizer instance
+    # Ensure models initialized (lazy)
+    await init_voice_models(websocket.app if hasattr(websocket, 'app') else None)
+
+    KaldiRecognizer = _state.get('KaldiRecognizer')
+    vosk_model = _state.get('vosk_model')
+    torch = _state.get('torch')
+    emotion_labels = _state.get('emotion_labels')
+
+    if KaldiRecognizer is None or vosk_model is None or torch is None:
+        # Models not ready; accept and close
+        await websocket.close(code=1011)
+        return
+
+    recognizer = KaldiRecognizer(vosk_model, sample_rate)  # Creates a Vosk recognizer instance
     audio_buffer = bytearray()  # Buffer for sliding window (voice sentiment)
-    window_seconds = 1.5 # 1.5 seconds window size for better emotion detection
+    window_seconds = 1.5  # 1.5 seconds window size for better emotion detection
     window_size = int(window_seconds * sample_rate * 2)  # 2 bytes per int16 sample, ensure integer
     stop_task = False
 
@@ -217,22 +291,22 @@ async def websocket_audio(websocket: WebSocket):
                 # Get the most recent window_size bytes
                 window_bytes = audio_buffer[-window_size:]
                 audio_np = np.frombuffer(window_bytes, dtype=np.int16).astype(np.float32) / 32767.0
-                
+
                 try:
                     # VAD check on raw audio first
                     speech_segments = vad(torch.tensor(audio_np).unsqueeze(0), sample_rate, aggressiveness=2)
-                    
+
                     if speech_segments:
                         # Calculate speech ratio to avoid processing very short speech
                         total_speech = sum(end - start for start, end in speech_segments)
                         speech_ratio = total_speech / window_seconds
-                        
+
                         # Only process if speech ratio is high enough (>30%)
                         if speech_ratio > 0.3:
                             # Run audio preprocessing only when needed
                             filtered_audio = audio_preprocessing(audio_np, sample_rate)
                             segment_tensor = torch.tensor(filtered_audio).unsqueeze(0)
-                            
+
                             # Analyze emotion on preprocessed audio
                             emotion, emotion_time = analyze_emotion(segment_tensor, sample_rate)
                             await websocket.send_text(json.dumps({
@@ -240,11 +314,6 @@ async def websocket_audio(websocket: WebSocket):
                                 "emotion": emotion,
                                 "speech_ratio": round(speech_ratio, 2)
                             }))
-                            # Comment out if not testing
-                            # Find highest emotion and its confidence
-                            #highest_emotion = max(emotion.items(), key=lambda x: x[1])
-                            #emotion_name = {"ang": "Angry", "hap": "Happy", "neu": "Neutral", "sad": "Sad"}[highest_emotion[0]]
-                            #logger.info(f"🎤 Voice emotion: {emotion_name} ({highest_emotion[1]:.1%}) in {emotion_time:.4f}s")
                         else:
                             # Low speech activity. Don't send anything
                             pass
@@ -255,21 +324,17 @@ async def websocket_audio(websocket: WebSocket):
                             "emotion": {label: 0.0 for label in emotion_labels},
                             "speech_ratio": 0.0
                         }))
-                        # Comment out if not testing
-                        # logger.info(f"🎤 No speech detected - neutral emotion sent")
                 except Exception as e:
-                    # Comment out if not testing
-                    # logger.error(f"🎤 Voice sentiment error: {e}")
                     # Send neutral emotion on error so client knows something happened
                     await websocket.send_text(json.dumps({
                         "type": "voice_sentiment",
-                        "emotion": {label: 0.0 if label != "neu" else 1.0 for label in emotion_labels},
+                        "emotion": {label: 0.0 if label != 'neu' else 1.0 for label in emotion_labels},
                         "error": str(e)
                     }))
             await asyncio.sleep(1)
 
     voice_sentiment_task = asyncio.create_task(perform_voice_sentiment())
-    
+
     try:
         while True:
             data = await websocket.receive_bytes()
@@ -287,18 +352,28 @@ async def websocket_audio(websocket: WebSocket):
                 if final_text.strip():
                     transcript_start_time = time.time()
                     last_transcript = final_text
-                    
+
                     # Text sentiment analysis: call the /api/text-sentiment endpoint
                     sentiment_start_time = time.time()
-                    async with httpx.AsyncClient() as client:
-                        resp = await client.post("http://localhost:8000/api/text-sentiment", json={"text": final_text})
-                        sentiment = resp.json()
+                    # Prefer internal client if available to avoid creating per-call clients
+                    client = _state.get('httpx_client')
+                    if client is None:
+                        try:
+                            import httpx
+                            async with httpx.AsyncClient() as temp_client:
+                                resp = await temp_client.post("http://localhost:8000/api/text-sentiment", json={"text": final_text})
+                                sentiment = resp.json()
+                        except Exception:
+                            sentiment = {"label": "NEUTRAL", "score": 0.0}
+                    else:
+                        try:
+                            resp = await client.post("http://localhost:8000/api/text-sentiment", json={"text": final_text})
+                            sentiment = resp.json()
+                        except Exception:
+                            sentiment = {"label": "NEUTRAL", "score": 0.0}
                     sentiment_time = time.time() - sentiment_start_time
-                    
+
                     total_transcript_time = time.time() - transcript_start_time
-                    # Comment out if not testing
-                    # logger.info(f"📝 Text sentiment analysis completed in {total_transcript_time:.4f} seconds")
-                    
                     await websocket.send_text(json.dumps({
                         "type": "text_sentiment",
                         "text": final_text,
@@ -311,10 +386,11 @@ async def websocket_audio(websocket: WebSocket):
                     "type": "partial",
                     "text": partial.get("partial", "")
                 }))
-    except Exception as e:
-        # Comment out if not testing
-        # logger.error(f"🔌 WebSocket closed or error: {e}")
+    except Exception:
         pass
     finally:
         stop_task = True
-        await voice_sentiment_task
+        try:
+            await voice_sentiment_task
+        except Exception:
+            pass
