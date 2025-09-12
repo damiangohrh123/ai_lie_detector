@@ -89,7 +89,13 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
 
   const truthScore = (result && anyPresent) ? (result.score !== null ? (1 - result.score) : null) : null;
   const percent = truthScore !== null ? (truthScore * 100).toFixed(1) : null;
-  const confidenceLabel = truthScore !== null ? getConfidenceLabel(result ? result.score : 0) : '';
+
+  let confidenceLabel = '';
+  if (truthScore !== null) {
+    confidenceLabel = getConfidenceLabel(result ? result.score : 0);
+  } else {
+    confidenceLabel = 'No Modalities Present';
+  }
   const barColor = truthScore !== null ? (truthScore > 0.5 ? '#22c55e' : (truthScore > 0.2 ? '#e69c14' : '#ef4444')) : '#9ca3af';
 
   const modalities = [
@@ -103,7 +109,7 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
       {error && <div className="fusion-error">{error}</div>}
       <>
         <div className="fusion-percent" style={{ color: barColor }}>{percent !== null ? `${percent}%` : 'None'}</div>
-        <div className="fusion-confidence" style={{ color: barColor }}>{percent !== null ? confidenceLabel : ''}</div>
+        <div className="fusion-confidence" style={{ color: barColor }}>{confidenceLabel || ''}</div>
         <div className="fusion-footer">0% = Highly Deceptive &nbsp;|&nbsp; 100% = Completely Truthful</div>
 
         <div className="truth-score-bar-background" style={{ marginTop: 18 }}>
