@@ -247,6 +247,7 @@ async def health_check():
             "error": str(e)
         }
 
+
 @router.get("/")
 async def root():
     """Root endpoint"""
@@ -259,7 +260,9 @@ async def root():
         }
     }
 
+
 last_transcript = ""
+
 
 @router.websocket("/ws/audio")
 async def websocket_audio(websocket: WebSocket):
