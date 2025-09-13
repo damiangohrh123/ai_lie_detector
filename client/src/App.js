@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import WebcamPage from './pages/WebcamPage';
 import FileUploadPage from './pages/FileUploadPage';
@@ -59,8 +59,40 @@ function Navigation() {
         <div className="mode-separator">
           {/* Export button shows progress and is disabled while exporting */}
           <ExportButton />
+          <ThemeToggle />
         </div>
     </nav>
+  );
+}
+
+function ThemeToggle() {
+  const [dark, setDark] = useState(() => {
+    try {
+      const v = localStorage.getItem('theme');
+      if (v) return v === 'dark';
+      // fallback to prefers-color-scheme
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (dark) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    } catch (e) {}
+  }, [dark]);
+
+  return (
+    <button
+      className="nav-theme-toggle"
+      onClick={() => setDark(d => !d)}
+      aria-pressed={dark}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {dark ? '🌙' : '☀️'}
+    </button>
   );
 }
 
