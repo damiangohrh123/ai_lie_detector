@@ -45,6 +45,10 @@
   --badge-contrib-text: #4874ec;
   --badge-absent-bg: #e6e9ee;
   --badge-absent-text: #475569;
+  --color-voice: #60a5fa;
+  --color-face: #fb923c;
+  --color-speech: #34d399;
+  --color-overall: #a78bfa;
 }
 
 .dark {
@@ -124,9 +128,10 @@ body {
 }
 
 .nav-export-btn {
+  height: 100%;
   padding: 6px 12px;
   border-radius: 6px;
-  font-weight: 500;
+  font-weight: 700;
   font-size: 12px;
   background: #10b981;
   color: #ffffff;
@@ -148,6 +153,32 @@ body {
 
 .nav-theme-toggle[aria-pressed="true"] { background: var(--bar-background-color); }
 
+.app-root { min-height: 100vh; background: var(--background-color); }
+
+.nav-link {
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 12px;
+  transition: all 0.2s;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-link.active {
+  background: var(--primary);
+  color: var(--primary-contrast);
+}
+.nav-link:not(.active) {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid rgba(75,85,99,0.12);
+}
+
+.nav-export-btn[aria-busy="true"] { opacity: 0.7; }
+
 /* Theme switch styling: a rounded track with a sliding thumb */
 .theme-switch { display: inline-flex; align-items: center; justify-content: flex-start; width: 56px; height: 32px; padding: 4px; border-radius: 999px; position: relative; background: var(--bar-background-color); transition: background 200ms ease, border 200ms ease; }
 .theme-switch .switch-thumb { width: 24px; height: 24px; border-radius: 50%; background: var(--card-background); display: inline-flex; align-items: center; justify-content: center; transform: translateX(0); transition: transform 220ms cubic-bezier(.2,.9,.2,1), background 200ms ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-size: 14px; }
@@ -155,9 +186,7 @@ body {
 .theme-switch .switch-thumb.off { transform: translateX(0); }
 .theme-switch:focus { outline: none; }
 .theme-switch:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,0.12); border-radius: 999px; }
-.theme-switch .switch-thumb svg { width: 14px; height: 14px; color: var(--text-color); }
-.theme-switch .switch-thumb svg { display: block; }
-.theme-switch .switch-thumb svg { width: 14px; height: 14px; color: var(--text-color); }
+.theme-switch .switch-thumb svg { width: 14px; height: 14px; color: var(--text-color); display: block; }
 .theme-switch .switch-thumb svg path { fill: currentColor; }
 
 
@@ -215,12 +244,22 @@ body {
 }
 
 .section-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: var(--heading-text-color);
   font-size: 18px;
   font-weight: 500;
-  padding: 0;
   margin: 0 0 20px 0;
 }
+
+.section-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 9999px; margin-right: 8px; flex: 0 0 40px; }
+.section-icon svg { width: 28px; height: 28px; display: block; }
+.section-icon-face { color: var(--color-face); }
+.section-icon-voice { color: var(--color-voice); }
+.section-icon-speech { color: var(--color-speech); }
+.section-icon-overall { color: var(--color-overall); }
+.section-icon-face svg * , .section-icon-voice svg * , .section-icon-speech svg * , .section-icon-overall svg * { fill: currentColor; stroke: currentColor; }
 
 
 
@@ -247,10 +286,10 @@ body {
   width: 100%;
   height: 12px;
   background: var(--bar-background-color);
-  border-radius: 6px;
+  border-radius: 999px;
+  overflow: hidden;
   position: relative;
   margin: 24px 0;
-  position: relative;
 }
 
 
@@ -382,10 +421,11 @@ body {
 
 
 
-
 .fusion-percent { font-size:48px; font-weight:500; }
 .fusion-confidence { font-size:14px; color:#666; }
-.truth-score-bar-background { width:100%; height:12px; background:#e6e9ee; border-radius: 999px; overflow:hidden; }
+.truth-score-bar-background { width:100%; height:12px; background: var(--bar-background-color); border-radius: 999px; overflow:hidden; }
+
+.dark .truth-score-bar-background { background: var(--bar-background-color); }
 .fusion-footer { font-size:12px; color:#94a3b8; margin-top:6px; }
 
 
@@ -405,7 +445,6 @@ body {
 
 .truth-score-bar-background { position: relative; }
 
-/* Modalities status badges */
 .fusion-modality-list { display:flex; flex-direction:column; gap:8px; width:100%; margin-top:8px; }
 .modality-pill { display:flex; align-items:center; gap:12px; padding:8px 12px; }
 .modality-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }

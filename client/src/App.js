@@ -9,53 +9,8 @@ function Navigation() {
 
   return (
     <nav className="mode-selector" >
-      <Link
-        to="/"
-        style={{
-          padding: '6px 12px',
-          borderRadius: '6px',
-          textDecoration: 'none',
-          fontWeight: '500',
-          fontSize: '12px',
-          transition: 'all 0.2s',
-          textAlign: 'center',
-          whiteSpace: 'nowrap',
-          ...(location.pathname === '/' ? {
-            background: '#3b82f6',
-            color: '#ffffff'
-          } : {
-            background: 'transparent',
-            color: '#d1d5db',
-            border: '1px solid #4b5563'
-          })
-        }}
-      >
-        Webcam
-      </Link>
-
-      <Link
-        to="/upload"
-        style={{
-          padding: '6px 12px',
-          borderRadius: '6px',
-          textDecoration: 'none',
-          fontWeight: '500',
-          fontSize: '12px',
-          transition: 'all 0.2s',
-          textAlign: 'center',
-          whiteSpace: 'nowrap',
-          ...(location.pathname === '/upload' ? {
-            background: '#3b82f6',
-            color: '#ffffff'
-          } : {
-            background: 'transparent',
-            color: '#d1d5db',
-            border: '1px solid #4b5563'
-          })
-        }}
-      >
-        Upload
-      </Link>
+      <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}>Webcam</Link>
+      <Link to="/upload" className={`nav-link ${location.pathname === '/upload' ? 'active' : ''}`}>Upload</Link>
         <div className="mode-separator">
           <ExportButton />
           <ThemeToggle />
@@ -134,7 +89,6 @@ function ExportButton() {
       className="nav-export-btn"
       disabled={isExporting}
       aria-busy={isExporting}
-      style={{ opacity: isExporting ? 0.7 : 1 }}
     >
       {isExporting ? 'Exporting...' : 'Export Summary'}
     </button>
@@ -145,7 +99,7 @@ function ExportButton() {
 export default function App() {
   return (
     <Router>
-      <div style={{ minHeight: '100vh', background: '#f3f4f6' }}>
+      <div className="app-root">
         <Navigation />
         <Routes>
           <Route path="/" element={<WebcamPage />} />

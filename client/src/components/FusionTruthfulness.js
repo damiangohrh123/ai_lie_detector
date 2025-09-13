@@ -98,10 +98,19 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
   }
   const barColor = truthScore !== null ? (truthScore > 0.5 ? '#22c55e' : (truthScore > 0.2 ? '#e69c14' : '#ef4444')) : '#9ca3af';
 
+  function cssVar(name, fallback) {
+    try {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name);
+      return v ? v.trim() : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
   const modalities = [
-    { name: 'Voice', color: '#3b82f6', key: 'voice' },
-    { name: 'Face', color: '#FF9800', key: 'face' },
-    { name: 'Speech', color: '#4CAF50', key: 'text' }
+    { name: 'Voice', color: cssVar('--color-voice', '#60a5fa'), key: 'voice' },
+    { name: 'Face', color: cssVar('--color-face', '#fb923c'), key: 'face' },
+    { name: 'Speech', color: cssVar('--color-speech', '#34d399'), key: 'text' }
   ];
 
   return (
@@ -122,9 +131,9 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
               {(() => {
                 const showAny = anyPresent && serverHasContrib;
                 const order = [
-                  { key: 'voice', color: '#1565C0' },
-                  { key: 'face', color: '#FF9800' },
-                  { key: 'text', color: '#4CAF50' }
+                  { key: 'voice', color: cssVar('--color-voice', '#60a5fa') },
+                  { key: 'face', color: cssVar('--color-face', '#fb923c') },
+                  { key: 'text', color: cssVar('--color-speech', '#34d399') }
                 ];
 
                 if (!showAny) {
