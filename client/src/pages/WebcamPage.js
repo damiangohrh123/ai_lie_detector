@@ -14,6 +14,7 @@ export default function WebcamPage() {
   const [deceptionTimeline, setDeceptionTimeline] = useState([]);
   const [fusionScore, setFusionScore] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
+  const audioRef = useRef(null);
 
   // Use transcriptHistory for display
   const transcript = transcriptHistory.map(r => r.text).join(' ');
@@ -147,8 +148,8 @@ export default function WebcamPage() {
         try { setDeceptionTimeline([]); } catch (e) { }
         try { setFusionScore(null); } catch (e) { }
 
-        // Also clear internal buffers in AudioProcessor
-        try { if (window && window.__clearAudioTranscripts) { window.__clearAudioTranscripts(); } } catch (e) { }
+  // Also clear internal buffers in AudioProcessor
+  try { audioRef.current?.clear(); } catch (e) { }
       } else {
         // Try to parse JSON error
         let bodyText = await resp.text();
@@ -188,6 +189,7 @@ export default function WebcamPage() {
         <section className="voice-section">
           <h2 className="section-label">👄 Voice Analysis</h2>
           <AudioProcessor
+            ref={audioRef}
             mode="live"
             setVoiceResults={setVoiceResults}
             setTranscriptHistory={setTranscriptHistory}

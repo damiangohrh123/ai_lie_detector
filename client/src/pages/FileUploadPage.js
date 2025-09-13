@@ -18,6 +18,7 @@ export default function FileUploadPage() {
   const [fusionScore, setFusionScore] = useState(null);
   const [videoRef, setVideoRef] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const audioRef = useRef(null);
 
   // Get latest [truth, lie] for face modality
   let faceVec = undefined;
@@ -165,8 +166,8 @@ export default function FileUploadPage() {
         try { setDeceptionTimeline([]); } catch (e) { }
         try { setFusionScore(null); } catch (e) { }
 
-        // Also clear internal buffers in AudioProcessor
-        try { if (window && window.__clearAudioTranscripts) { window.__clearAudioTranscripts(); } } catch (e) { }
+  // Also clear internal buffers in AudioProcessor
+  try { audioRef.current?.clear(); } catch (e) { }
       } else {
         let bodyText = await resp.text();
         try {
@@ -249,6 +250,7 @@ export default function FileUploadPage() {
             <section className="voice-section">
               <h2 className="section-label">👄 Voice Analysis</h2>
               <AudioProcessor
+                ref={audioRef}
                 mode="video"
                 videoFile={uploadedFile}
                 videoRef={videoRef}

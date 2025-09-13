@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 
 const EMOTIONS = {
   neu: { name: "Neutral", color: '#9E9E9E' },
@@ -11,13 +11,13 @@ const WS_URL = "ws://localhost:8000/ws/audio";
 const MOVING_AVG_WINDOW = 3;
 const RECONNECT_DELAY = 3000;
 
-export default function AudioProcessor({ 
+function AudioProcessor({ 
   mode = 'video', // Live (webcam) or video (uploaded) mode
   videoFile = null, // A file object (e.g. mp4)
   videoRef = null, // A ref to the video element to get audio stream
   setVoiceResults, 
   setTranscriptHistory 
-}) {
+}, ref) {
   const [results, setResults] = useState([]);
   const [transcriptHistory, setTranscriptHistoryState] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -291,20 +291,19 @@ export default function AudioProcessor({
   }, [transcriptHistory, setTranscriptHistory]);
 
   // Expose a global clear hook so parent pages can wipe internal buffers after export
-  useEffect(() => {
-    const clearFn = () => {
-      try {
-        transcriptBufferRef.current = [];
-        if (flushTimeoutRef.current) { clearTimeout(flushTimeoutRef.current); flushTimeoutRef.current = null; }
-        setTranscriptHistoryState([]);
-        setResults([]);
-        setVoiceEmotionHistory([]);
-      } catch (e) { /* ignore */ }
-    };
-    // Attach to window for quick integration
-    try { window.__clearAudioTranscripts = clearFn; } catch (e) {}
-    return () => { try { if (window.__clearAudioTranscripts === clearFn) delete window.__clearAudioTranscripts; } catch (e) {} };
-  }, []);
+  // Provide a clear() method to parent via ref instead of using a global window variable
+  const clearFn = () => {
+    try {
+      transcriptBufferRef.current = [];
+      if (flushTimeoutRef.current) { clearTimeout(flushTimeoutRef.current); flushTimeoutRef.current = null; }
+      setTranscriptHistoryState([]);
+      setResults([]);
+      setVoiceEmotionHistory([]);
+    } catch (e) { /* ignore */ }
+  };
+
+  // Expose clear() to parent via ref
+  useImperativeHandle(ref, () => ({ clear: clearFn }), [clearFn]);
 
   // Clean up old emotions periodically to reset bars when no recent sentiments
   useEffect(() => {
@@ -352,26 +351,22 @@ export default function AudioProcessor({
   }, [results, setVoiceResults]);
 
   // Calculate average emotion
-  const getAvgEmotion = (emotion) => {
-    const validEmotions = voiceEmotionHistory.filter(e => e[emotion] !== undefined);
-    if (validEmotions.length === 0) return 0;
-    
-    // Check for voice sentiments within the last 3 seconds.
+  // Memoize averages for all emotions to avoid repeated scans in render
+  const avgEmotions = useMemo(() => {
     const now = Date.now();
-    const recentEmotions = validEmotions.filter(e => {
-      // Only process emotions with timestamps
-      if (e.timestamp) {
-        return (now - e.timestamp) < 3000;
+    const windowMs = 3000;
+    const out = {};
+    Object.keys(EMOTIONS).forEach((emotion) => {
+      const valid = voiceEmotionHistory.filter(e => e[emotion] !== undefined && e.timestamp && (now - e.timestamp) < windowMs);
+      if (valid.length === 0) {
+        out[emotion] = 0;
+      } else {
+        const sum = valid.reduce((acc, e) => acc + e[emotion], 0);
+        out[emotion] = (sum / valid.length) * 100;
       }
-      return false;
     });
-    
-    // If no recent emotions, return 0 to reset bars
-    if (recentEmotions.length === 0) return 0;
-    
-    const sum = recentEmotions.reduce((acc, e) => acc + e[emotion], 0);
-    return (sum / recentEmotions.length) * 100;
-  };
+    return out;
+  }, [voiceEmotionHistory]);
 
   // Get connection status display
   const getConnectionStatusDisplay = () => {
@@ -393,7 +388,7 @@ export default function AudioProcessor({
             <span className="voice-analysis-bars-label">{name}</span>
             <div className="voice-analysis-bar-background">
               <div style={{
-                width: `${getAvgEmotion(key)}%`,
+                width: `${avgEmotions[key]}%`,
                 height: '100%',
                 background: color,
                 borderRadius: 4,
@@ -408,11 +403,13 @@ export default function AudioProcessor({
               color: '#666', 
               fontWeight: '500' 
             }}>
-              {getAvgEmotion(key).toFixed(1)}%
+              {avgEmotions[key].toFixed(1)}%
             </span>
           </div>
         ))}
       </div>
     </div>
   );
-} 
+}
+
+export default forwardRef(AudioProcessor);
