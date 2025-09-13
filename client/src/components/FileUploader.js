@@ -95,26 +95,26 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
   const getStatusColor = () => {
     switch (uploadStatus) {
       case 'complete':
-        return '#22c55e';
+        return 'var(--truth-green, #22c55e)';
       case 'error':
-        return '#ef4444';
+        return 'var(--deceptive-red, #ef4444)';
       case 'analyzing':
-        return '#f59e0b';
+        return 'var(--medium-orange, #f59e0b)';
       default:
-        return '#6b7280';
+        return 'var(--muted, #6b7280)';
     }
   };
 
   return (
     <div className="file-upload-container">
 
-      <div style={{ fontSize: 48 }}>📁</div>
+  <div style={{ fontSize: 48 }}>📁</div>
 
       <div className="file-upload-text-content">
-        <h3 style={{ margin: 0, color: '#374151', fontSize: 18, fontWeight: 600 }}>
+        <h3 style={{ margin: 0, color: 'var(--heading-text-color, #374151)', fontSize: 18, fontWeight: 600 }}>
           Upload Video File
         </h3>
-        <p style={{ margin: 0, color: '#6b7280', fontSize: 14, textAlign: 'center' }}>
+        <p style={{ margin: 0, color: 'var(--muted, #6b7280)', fontSize: 14, textAlign: 'center' }}>
           Select a video file (MP4, AVI, MOV) to analyze for deception detection
         </p>
 
@@ -130,8 +130,8 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
         <label
           htmlFor="video-upload"
           style={{
-            background: isUploading ? '#e5e7eb' : '#3b82f6',
-            color: 'white',
+            background: isUploading ? 'var(--progress-bg, #e5e7eb)' : 'var(--primary, #3b82f6)',
+            color: 'var(--primary-contrast, white)',
             padding: '12px 24px',
             borderRadius: 8,
             cursor: isUploading ? 'not-allowed' : 'pointer',
@@ -148,16 +148,16 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
       {/* Selected File Info */}
       {selectedFile && (
         <div style={{
-          background: '#e0f2fe',
+          background: 'var(--info-bg, #e0f2fe)',
           padding: '12px 16px',
           borderRadius: 8,
-          border: '1px solid #0288d1',
+          border: '1px solid var(--info-border, #0288d1)',
           marginTop: 12
         }}>
-          <div style={{ fontWeight: 500, color: '#0277bd', fontSize: 14 }}>
+          <div style={{ fontWeight: 500, color: 'var(--info-text, #0277bd)', fontSize: 14 }}>
             Selected: {selectedFile.name}
           </div>
-          <div style={{ color: '#0277bd', fontSize: 12 }}>
+          <div style={{ color: 'var(--info-text, #0277bd)', fontSize: 12 }}>
             Size: {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
           </div>
         </div>
@@ -168,8 +168,8 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
         <button
           onClick={handleUpload}
           style={{
-            background: '#22c55e',
-            color: 'white',
+            background: 'var(--btn-success-bg, #22c55e)',
+            color: 'var(--btn-success-contrast, white)',
             border: 'none',
             padding: '12px 24px',
             borderRadius: 8,
@@ -189,14 +189,14 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
           <div style={{
             width: '100%',
             height: 8,
-            background: '#e5e7eb',
+            background: 'var(--progress-bg, #e5e7eb)',
             borderRadius: 4,
             overflow: 'hidden'
           }}>
             <div style={{
               width: `${uploadProgress}%`,
               height: '100%',
-              background: uploadStatus === 'analyzing' ? '#f59e0b' : '#3b82f6',
+              background: uploadStatus === 'analyzing' ? 'var(--medium-orange, #f59e0b)' : 'var(--progress-fill, var(--primary))',
               transition: 'width 0.3s ease'
             }} />
           </div>
@@ -215,11 +215,11 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
       {/* Status Messages */}
       {uploadStatus === 'complete' && (
         <div style={{
-          background: '#dcfce7',
-          color: '#15803d',
+          background: 'var(--success-bg, #dcfce7)',
+          color: 'var(--success-text, #15803d)',
           padding: '12px 16px',
           borderRadius: 8,
-          border: '1px solid #22c55e',
+          border: '1px solid var(--truth-green, #22c55e)',
           marginTop: 12
         }}>
           ✅ Analysis complete! Results are now displayed below.
@@ -228,11 +228,11 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
 
       {uploadStatus === 'error' && (
         <div style={{
-          background: '#fee2e2',
-          color: '#b91c1c',
+          background: 'var(--error-bg, #fee2e2)',
+          color: 'var(--error-text, #b91c1c)',
           padding: '12px 16px',
           borderRadius: 8,
-          border: '1px solid #ef4444',
+          border: '1px solid var(--deceptive-red, #ef4444)',
           marginTop: 12
         }}>
           ❌ Upload failed. Please try again.
