@@ -76,10 +76,8 @@ pycparser==2.22
 pydantic==2.11.5
 pydantic_core==2.33.2
 pydub==0.25.1
-pyee==13.0.0
 Pygments==2.19.1
 pyparsing==3.2.3
-pyppeteer==2.0.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
 python-multipart==0.0.20
