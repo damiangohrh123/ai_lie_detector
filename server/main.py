@@ -43,7 +43,14 @@ app.include_router(export_router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize heavy models on startup in background threads to avoid blocking the event loop. We try to initialize voice and text models."""
+    """Optionally initialize heavy models on startup. Set `PRELOAD_MODELS=1` to enable preloading."""
+    import os
+
+    preload = os.environ.get('PRELOAD_MODELS', '0')
+    if preload not in ('1', 'true', 'yes', 'True'):
+        logging.getLogger(__name__).info("PRELOAD_MODELS not set — skipping heavy model initialization on startup.")
+        return
+
     async def _init_text():
         try:
             await text_api_module.init_text_model(app)
