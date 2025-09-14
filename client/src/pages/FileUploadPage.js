@@ -141,7 +141,8 @@ export default function FileUploadPage() {
         video_url: null
       };
 
-      const respPromise = fetch('http://localhost:8000/api/export-summary', {
+  const API_BASE = (process.env.REACT_APP_API_BASE || 'http://localhost:8000').replace(/\/+$/, '');
+  const respPromise = fetch(`${API_BASE}/api/export-summary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

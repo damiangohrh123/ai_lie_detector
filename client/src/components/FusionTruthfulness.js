@@ -59,7 +59,8 @@ export default function FusionTruthfulness({ face, voice, text, setFusionScore }
         if (since < REQUEST_INTERVAL) return;
       }
       if (payloadString) lastPayloadRef.current = payloadString;
-      fetch('http://localhost:8000/api/fusion-truthfulness', {
+  const API_BASE = (process.env.REACT_APP_API_BASE || 'http://localhost:8000').replace(/\/+$/, '');
+  fetch(`${API_BASE}/api/fusion-truthfulness`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ face, voice, text })

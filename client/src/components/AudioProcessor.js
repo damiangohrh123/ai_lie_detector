@@ -7,7 +7,10 @@ const EMOTIONS = {
   ang: { name: "Angry", color: '#F44336' }
 };
 
-const WS_URL = "ws://localhost:8000/ws/audio";
+// Determine WebSocket URL from environment. Prefer explicit WS var, else derive from API base.
+const _API_BASE = (process.env.REACT_APP_API_BASE || 'http://localhost:8000').replace(/\/+$/, '');
+const _WS_FROM_API = _API_BASE.replace(/^http/, 'ws');
+const WS_URL = process.env.REACT_APP_API_WS || `${_WS_FROM_API}/ws/audio`;
 const MOVING_AVG_WINDOW = 3;
 const RECONNECT_DELAY = 3000;
 
