@@ -179,8 +179,8 @@ export default function WebcamPage() {
     <div className="app-layout">
       <div className="first-pane">
         {/* Video area */}
-        <div style={{ position: 'relative' }}>
-          <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} onVideoRef={setVideoRef} />
+          <div style={{ position: 'relative' }}>
+          <FaceExpressionDetector onEmotionsUpdate={setFaceEmotions} onVideoRef={setVideoRef} onPlaybackEnd={() => { try { audioRef.current && audioRef.current.stop && audioRef.current.stop(); } catch (e) {} }} />
         </div>
       </div>
 

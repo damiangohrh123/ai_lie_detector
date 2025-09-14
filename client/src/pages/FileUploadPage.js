@@ -233,11 +233,14 @@ export default function FileUploadPage() {
 
         {/* Video area - only show when file is uploaded */}
         {uploadedFile && (
-          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
             <FaceExpressionDetector
               onEmotionsUpdate={setFaceEmotions}
               videoFile={uploadedFile}
               onVideoRef={setVideoRef}
+              onPlaybackEnd={() => {
+                try { audioRef.current && audioRef.current.stop && audioRef.current.stop(); } catch (e) {}
+              }}
             />
           </div>
         )}

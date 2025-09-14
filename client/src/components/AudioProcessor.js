@@ -303,7 +303,41 @@ function AudioProcessor({
   };
 
   // Expose clear() to parent via ref
-  useImperativeHandle(ref, () => ({ clear: clearFn }), [clearFn]);
+  // Stop processing. Disconnect nodes, close audio context and websocket
+  const stopProcessing = () => {
+    try {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
+      }
+      if (sourceNodeRef.current) {
+        try { sourceNodeRef.current.disconnect(); } catch (e) {}
+        sourceNodeRef.current = null;
+      }
+      if (workletNodeRef.current) {
+        try { workletNodeRef.current.disconnect(); } catch (e) {}
+        workletNodeRef.current = null;
+      }
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close(); } catch (e) {}
+        audioContextRef.current = null;
+      }
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch (e) {}
+        wsRef.current = null;
+      }
+      setConnectionStatus('disconnected');
+      setIsProcessing(false);
+    } catch (e) {
+      console.warn('stopProcessing failed', e);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({ clear: clearFn, stop: stopProcessing }), [clearFn]);
 
   // Clean up old emotions periodically to reset bars when no recent sentiments
   useEffect(() => {

@@ -578,3 +578,24 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+/* Playback feedback overlay shown when uploaded video ends */
+.playback-feedback-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 30;
+}
+.playback-feedback-box {
+  background: var(--card-background);
+  color: var(--card-foreground);
+  padding: 16px 20px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+  text-align: center;
+}
+.playback-feedback-message { font-weight: 700; }
+.playback-feedback-button { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; background: var(--primary); color: var(--primary-contrast); }

@@ -4,11 +4,13 @@ import PerformanceMonitor from '../utils/PerformanceMonitor';
 
 const MODEL_URL = '/models';
 
-export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = null, onVideoRef = null }) {
+export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = null, onVideoRef = null, onPlaybackEnd = null }) {
   const videoRef = useRef();
   const canvasRef = useRef();
+  const endedHandlerRef = useRef(null);
   const [currentEmotions, setCurrentEmotions] = useState([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [playbackEnded, setPlaybackEnded] = useState(false);
   const dimsRef = useRef(null);
 
   // Performance monitoring (Comment out if not testing)
@@ -55,10 +57,22 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
             videoRef.current.muted = false;
             videoRef.current.controls = true;
           } catch (e) {}
+          // Reset playback ended state when metadata loads
+          setPlaybackEnded(false);
           playVideo();
         };
 
+        function onEnded() {
+          setPlaybackEnded(true);
+          if (onPlaybackEnd && typeof onPlaybackEnd === 'function') {
+            try { onPlaybackEnd(); } catch (e) { console.warn(e); }
+          }
+        }
+
+        endedHandlerRef.current = onEnded;
+
         videoRef.current.addEventListener('loadedmetadata', onMetadataLoaded, { once: true });
+        videoRef.current.addEventListener('ended', endedHandlerRef.current);
       }
     }
 
@@ -229,8 +243,18 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
         tracks.forEach(track => track.stop());
       }
       // Clean up video file URL
-      if (videoRef.current && videoRef.current.src && videoRef.current.src.startsWith('blob:')) {
-        URL.revokeObjectURL(videoRef.current.src);
+        if (videoRef.current) {
+        if (videoRef.current.src && videoRef.current.src.startsWith('blob:')) {
+          URL.revokeObjectURL(videoRef.current.src);
+        }
+        // remove 'ended' listener if present
+        try {
+          if (endedHandlerRef.current && videoRef.current.removeEventListener) {
+            videoRef.current.removeEventListener('ended', endedHandlerRef.current);
+          }
+        } catch (e) {}
+        // clear stored handler
+        endedHandlerRef.current = null;
       }
     };
   }, [modelsLoaded, videoFile]);
@@ -247,9 +271,12 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
     }
   }, [onVideoRef]);
 
+  // simple handlers kept available if needed later
+  function handleEnableSound() { if (videoRef.current) try { videoRef.current.muted = false; } catch (e) { /* ignore */ } }
+
     return (
     <div className="app-container" style={{ display: 'flex' }}>
-      <div className="video-wrapper">
+      <div className="video-wrapper" style={{ position: 'relative' }}>
         <video
           ref={videoRef}
           autoPlay
@@ -267,6 +294,15 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
           className="overlay-canvas"
           style={{ width: '640px', height: '360px', position: 'absolute', top: 0, left: 0 }}
         />
+
+        {playbackEnded && (
+          <div className="playback-feedback-overlay">
+            <div className="playback-feedback-box">
+              <div className="playback-feedback-message">Playback finished</div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
