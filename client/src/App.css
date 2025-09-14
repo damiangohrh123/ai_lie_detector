@@ -579,6 +579,12 @@ body {
   gap: 8px;
 }
 
+.file-upload-container.dragover {
+  border-color: var(--primary);
+  box-shadow: 0 8px 24px rgba(59,130,246,0.12);
+  background: linear-gradient(180deg, rgba(59,130,246,0.03), transparent);
+}
+
 /* Playback feedback overlay shown when uploaded video ends */
 .playback-feedback-overlay {
   position: absolute;

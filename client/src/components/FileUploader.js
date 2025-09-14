@@ -5,6 +5,7 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('idle'); // 'idle', 'uploading', 'analyzing', 'complete', 'error'
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -26,6 +27,26 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
       setSelectedFile(file);
       setUploadStatus('idle');
     }
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setIsDragOver(false);
+    const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+    if (file) {
+      const fakeEvt = { target: { files: [file] } };
+      handleFileSelect(fakeEvt);
+    }
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    setIsDragOver(false);
   };
 
   const handleUpload = async () => {
@@ -106,7 +127,7 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
   };
 
   return (
-    <div className="file-upload-container">
+  <div className={`file-upload-container ${isDragOver ? 'dragover' : ''}`} onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}>
 
   <div style={{ fontSize: 48 }}>📁</div>
 
