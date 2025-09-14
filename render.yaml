@@ -1,11 +1,11 @@
 services:
   - type: web_service
     name: ai_lie_detector-backend
-    env: python
+    env: docker
     repo: https://github.com/damiangohrh123/ai_lie_detector
     branch: main
     root: server
-    buildCommand: pip install -r requirements.txt
+    dockerfilePath: server/Dockerfile
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     instances:
       type: pro
