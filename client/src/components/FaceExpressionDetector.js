@@ -33,9 +33,9 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
 
     // Function for starting video file playback
     function startVideoFile() {
-      if (videoRef.current && videoFile) {
-        const videoUrl = URL.createObjectURL(videoFile);
-        videoRef.current.src = videoUrl;
+    if (videoRef.current && videoFile) {
+      const videoUrl = URL.createObjectURL(videoFile);
+      videoRef.current.src = videoUrl;
 
         // Function to try to play video. If error, retry after 1 second.
         const playVideo = () => {
@@ -50,6 +50,11 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
           if (canvasRef.current && videoRef.current) {
             dimsRef.current = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
           }
+          // For uploaded files, allow audio playback and controls
+          try {
+            videoRef.current.muted = false;
+            videoRef.current.controls = true;
+          } catch (e) {}
           playVideo();
         };
 
@@ -69,7 +74,7 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
       })
         // If permission granted, start video stream
         .then(stream => {
-          if (videoRef.current) {
+            if (videoRef.current) {
             videoRef.current.srcObject = stream;
 
             // Cache dimensions once when webcam metadata loads
@@ -242,16 +247,17 @@ export default function FaceExpressionDetector({ onEmotionsUpdate, videoFile = n
     }
   }, [onVideoRef]);
 
-  return (
+    return (
     <div className="app-container" style={{ display: 'flex' }}>
       <div className="video-wrapper">
         <video
           ref={videoRef}
           autoPlay
-          muted
+          muted={videoFile ? false : true}
           playsInline
           width="960"
           height="540"
+          controls={videoFile ? true : false}
           style={{ width: '640px', height: '360px' }}
         />
         <canvas
