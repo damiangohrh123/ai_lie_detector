@@ -31,21 +31,23 @@ class PerformanceMonitor {
       this.metrics.successfulFrames++;
     }
     
-    // Log based on frame count and result
-    if (hasResult && this.metrics.frameCount % 5 === 0) {
-      const avgProcessingTime = this.metrics.totalProcessingTime / this.metrics.frameCount;
-      console.log(`${this.componentName} Frame ${this.metrics.frameCount}: ${processingTime.toFixed(0)}ms (avg: ${avgProcessingTime.toFixed(0)}ms)`);
-    } else if (!hasResult && this.metrics.frameCount % 50 === 0) {
-      console.log(`${this.componentName} Frame ${this.metrics.frameCount}: No result detected (${processingTime.toFixed(0)}ms)`);
-    }
-    
-    // Log stats every 50 frames with detection rate
-    if (this.metrics.processingTimes.length > 0 && this.metrics.processingTimes.length % 50 === 0) {
-      const avg = this.metrics.processingTimes.reduce((sum, time) => sum + time, 0) / this.metrics.processingTimes.length;
-      const min = Math.min(...this.metrics.processingTimes);
-      const max = Math.max(...this.metrics.processingTimes);
-      const detectionRate = (this.metrics.successfulFrames / this.metrics.frameCount * 100).toFixed(1);
-      console.log(`${this.componentName} Stats (${this.metrics.processingTimes.length} frames): avg=${avg.toFixed(0)}ms, min=${min.toFixed(0)}ms, max=${max.toFixed(0)}ms, detection_rate=${detectionRate}%`);
+    if (this.isEnabled && this.debug) {
+      // Log based on frame count and result
+      if (hasResult && this.metrics.frameCount % 50 === 0) {
+        const avgProcessingTime = this.metrics.totalProcessingTime / this.metrics.frameCount;
+        console.debug(`${this.componentName} Frame ${this.metrics.frameCount}: ${processingTime.toFixed(0)}ms (avg: ${avgProcessingTime.toFixed(0)}ms)`);
+      } else if (!hasResult && this.metrics.frameCount % 500 === 0) {
+        console.debug(`${this.componentName} Frame ${this.metrics.frameCount}: No result detected`);
+      }
+
+      // Log stats
+      if (this.metrics.processingTimes.length > 0 && this.metrics.frameCount % 500 === 0) {
+        const avg = this.metrics.processingTimes.reduce((sum, time) => sum + time, 0) / this.metrics.processingTimes.length;
+        const min = Math.min(...this.metrics.processingTimes);
+        const max = Math.max(...this.metrics.processingTimes);
+        const detectionRate = (this.metrics.successfulFrames / this.metrics.frameCount * 100).toFixed(1);
+        console.debug(`${this.componentName} Stats: avg=${avg.toFixed(0)}ms, min=${min.toFixed(0)}ms, max=${max.toFixed(0)}ms, detection_rate=${detectionRate}%`);
+      }
     }
   }
 
@@ -63,7 +65,7 @@ class PerformanceMonitor {
 
   logStats() {
     const stats = this.getStats();
-    console.log(`${this.componentName} Final Stats:`, stats);
+    if (this.debug) console.debug(`${this.componentName} Final Stats:`, stats);
   }
 
   enable() {

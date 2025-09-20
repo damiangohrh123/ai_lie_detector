@@ -61,9 +61,8 @@ function AudioProcessor({
     };
     
     // On error, log it but don't set error status immediately (WebSocket errors are often transient)
-    wsRef.current.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      // Don't set error status here as it might be a transient error
+    wsRef.current.onerror = (_error) => {
+      console.warn("WebSocket encountered an error");
     };
     
     // On close, set status to 'disconnected' and handle reconnection logic.
@@ -145,8 +144,8 @@ function AudioProcessor({
             return newResults.slice(-3);
           });
         }
-      } catch (e) {
-        console.warn("Failed to parse WebSocket message:", e);
+      } catch (_e) {
+        console.warn("Received malformed WebSocket message");
       }
     };
   };
@@ -199,9 +198,7 @@ function AudioProcessor({
           await audioContextRef.current.audioWorklet.addModule('/pcm-processor.js');
           workletNodeRef.current = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
         } catch (workletError) {
-          console.error("Failed to load audio worklet:", workletError);
-          // Don't set error status - WebSocket is working fine
-          // Just log the error and continue
+          console.warn("Failed to load audio worklet");
         }
 
         // Connect audio nodes only if worklet was created successfully
@@ -229,9 +226,8 @@ function AudioProcessor({
           };
         }
       } catch (error) {
-        console.error("Failed to start audio streaming:", error);
-        // Only set error status for non-transient errors
-        if (error.name === 'InvalidStateError' || error.name === 'NotSupportedError') {
+        console.warn("Failed to start audio streaming");
+        if (error && (error.name === 'InvalidStateError' || error.name === 'NotSupportedError')) {
           setConnectionStatus('error');
         }
       }

@@ -89,8 +89,9 @@ export default function FileUploader({ setVoiceResults, setTranscriptHistory, se
         }
       }, 3000);
 
-    } catch (error) {
-      console.error('Upload failed:', error);
+    } catch (_error) {
+      // Avoid logging raw error details which may include sensitive info
+      console.warn('Upload failed');
       setUploadStatus('error');
       setIsUploading(false);
     }

@@ -180,7 +180,7 @@ export default function FileUploadPage() {
       }
       return resp;
     } catch (e) {
-      console.error('Export error', e);
+  console.error('Export error', e);
       alert('Export failed: ' + e.message);
     } finally {
       setExporting(false);

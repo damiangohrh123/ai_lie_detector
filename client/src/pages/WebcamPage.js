@@ -120,9 +120,6 @@ export default function WebcamPage() {
         video_url: null
       };
 
-      // DEBUG: log payload and relevant state
-      try { console.debug('Export payload (webcam):', { payload, voiceResults, textVec, transcriptHistory }); } catch (e) { }
-
   const API_BASE = (process.env.REACT_APP_API_BASE || 'http://localhost:8000').replace(/\/+$/, '');
   const respPromise = fetch(`${API_BASE}/api/export-summary`, {
         method: 'POST',
