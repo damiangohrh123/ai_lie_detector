@@ -4,15 +4,15 @@ AI Lie Detector is an experimental AI multimodal system that analyzes face, voic
 
 Key Features
 - Real-time facial emotion analysis via webcam using face-api.js.
-  ![Facial Emotion Detection](assets/1.png)
+  ![Facial Emotion Detection](assets/1.PNG)
 - Real-time speech emotion recognition with Wav2Vec2.0 and WebRTC VAD.
-  ![Speech Emotion Detection](assets/2.png)
+  ![Speech Emotion Detection](assets/2.PNG)
 - Text-based deception detection using DistilBERT on live transcripts
-  ![Text-based Deception Detection](assets/3.png)
+  ![Text-based Deception Detection](assets/3.PNG)
 - Multimodal fusion to output an aggregated deception likelihood score.
-  ![Multimodal Fusion](assets/4.png)
+  ![Multimodal Fusion](assets/4.PNG)
 - Live and recorded modes: supports webcam/live streaming and uploaded video/audio analysis.
-  ![File Upload analysis](assets/5.png)
+  ![File Upload analysis](assets/5.PNG)
 - WebSocket audio pipeline: low-latency audio streaming to the backend for continuous voice/text analysis.
 - Exportable session summaries: create a PDF session summary with timeline, thumbnail and top moments.
 
